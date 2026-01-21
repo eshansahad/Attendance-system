@@ -1,0 +1,10 @@
+mp_env/
+__pycache__/
+*.pyc
+
+# Database
+database/attendance.db
+
+# Face data (DO NOT UPLOAD)
+dataset/
+embeddings/
