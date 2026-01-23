@@ -5,8 +5,8 @@ import time
 # Ask student name
 student_name = input("Enter student name: ").strip()
 
-# Create dataset directory if not exists
-dataset_path = "dataset"
+# UPDATED: Path points to the new 'data_files' folder
+dataset_path = "data_files/dataset"
 student_path = os.path.join(dataset_path, student_name)
 
 if not os.path.exists(student_path):

@@ -8,3 +8,6 @@ database/attendance.db
 # Face data (DO NOT UPLOAD)
 dataset/
 embeddings/
+
+# Ignore CSV reports
+*.csv

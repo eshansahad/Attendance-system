@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register Student</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-fingerprint"></i> SmartAttend</div>
+        <ul class="menu">
+            <li><a href="/"><i class="fas fa-th-large"></i> Dashboard</a></li>
+            <li><a href="/register" class="active"><i class="fas fa-user-plus"></i> Register</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header"><h2>Register New Student</h2></div>
+        <div class="page-wrapper">
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <h3>Step 1: Student Details</h3>
+                <form action="/register" method="POST">
+                    <label>Student Name</label>
+                    <input type="text" name="student_name" required placeholder="Enter Full Name" style="width: 100%; margin-bottom: 20px;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Next: Capture Face</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

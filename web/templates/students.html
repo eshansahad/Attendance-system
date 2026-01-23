@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student List - Smart Attend</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand">
+            <i class="fas fa-fingerprint"></i>
+            <span>Smart</span>Attend
+        </div>
+        <ul class="menu">
+            <li><a href="/"><i class="fas fa-th-large"></i> Dashboard</a></li>
+            <li><a href="/students" class="active"><i class="fas fa-user-graduate"></i> Students</a></li>
+            <li><a href="/register"><i class="fas fa-user-plus"></i> Register</a></li>
+            <li><a href="/report"><i class="fas fa-file-alt"></i> Reports</a></li>
+            
+            <li style="margin-top: 50px; border-top: 1px solid #334155;">
+                <a href="/logout" style="color: #ef4444;"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h2>Manage Students</h2>
+            <div class="user-profile">
+                <span>Admin</span>
+                <div class="user-avatar"><i class="fas fa-user"></i></div>
+            </div>
+        </div>
+
+        <div class="page-wrapper">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin:0;">Registered Students</h3>
+                <a href="/register" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Student</a>
+            </div>
+
+            <div class="table-card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Student Name</th>
+                            <th>Class</th>
+                            <th>Password</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                        <tr>
+                            <td>#{{ student['id'] }}</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="card-icon bg-blue" style="width: 32px; height: 32px; font-size: 14px;">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <span style="font-weight: 500;">{{ student['name'] }}</span>
+                                </div>
+                            </td>
+                            <td>CS-A</td> 
+                            <td style="font-family: monospace; color: #fbbf24;">{{ student['password'] }}</td>
+                            <td>
+                                <a href="/delete_student/{{ student['id'] }}" 
+                                   class="btn" 
+                                   style="background:#ef4444; color:white; padding:6px 12px; display:inline-block;"
+                                   onclick="return confirm('Are you sure you want to delete this student? All their data will be removed.');">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

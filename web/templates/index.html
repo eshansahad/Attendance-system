@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand">
+            <i class="fas fa-fingerprint"></i>
+            <span>Smart</span>Attend
+        </div>
+        <ul class="menu">
+            <li><a href="/" class="active"><i class="fas fa-th-large"></i> Dashboard</a></li>
+            <li><a href="/students"><i class="fas fa-user-graduate"></i> Students</a></li>
+            <li><a href="/register"><i class="fas fa-user-plus"></i> Register</a></li>
+            <li><a href="/report"><i class="fas fa-file-alt"></i> Reports</a></li>
+            
+            <li style="margin-top: 50px; border-top: 1px solid #334155;">
+                <a href="/logout" style="color: #ef4444;"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        
+        <div class="header">
+            <h2>Teacher Dashboard</h2>
+            <div class="user-profile">
+                <span>Admin</span>
+                <div class="user-avatar"><i class="fas fa-user"></i></div>
+            </div>
+        </div>
+
+        <div class="page-wrapper">
+            
+            <div class="welcome-banner">
+                <div class="user-avatar" style="width: 50px; height: 50px; background: #ff9b44; color: white;">
+                    <i class="fas fa-user-graduate fa-lg"></i>
+                </div>
+                <div class="welcome-text">
+                    <h3>Welcome Back, Teacher!</h3>
+                    <p>You have <strong>2</strong> classes pending attendance today.</p>
+                </div>
+                <div style="margin-left: auto;">
+                    <a href="/start_camera" class="btn btn-primary"><i class="fas fa-camera"></i> Start Attendance</a>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="card">
+                    <div class="card-info">
+                        <h4>120</h4>
+                        <span>Total Students</span>
+                    </div>
+                    <div class="card-icon bg-orange"><i class="fas fa-users"></i></div>
+                </div>
+                <div class="card">
+                    <div class="card-info">
+                        <h4>{{ attendance|length }}</h4>
+                        <span>Present Today</span>
+                    </div>
+                    <div class="card-icon bg-green"><i class="fas fa-check"></i></div>
+                </div>
+                <div class="card">
+                    <div class="card-info">
+                        <h4>12</h4>
+                        <span>Absent</span>
+                    </div>
+                    <div class="card-icon bg-blue"><i class="fas fa-user-times"></i></div>
+                </div>
+                <div class="card">
+                    <div class="card-info">
+                        <h4>95%</h4>
+                        <span>Attendance Rate</span>
+                    </div>
+                    <div class="card-icon bg-purple"><i class="fas fa-chart-line"></i></div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin:0; font-size: 18px;">Today's Attendance</h3>
+                    <a href="/export" class="btn" style="background:#334155; color:white;">Download CSV</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Time In</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if attendance %}
+                            {% for row in attendance %}
+                            <tr>
+                                <td style="font-weight: bold;">{{ row[0] }}</td>
+                                <td>{{ row[2] }}</td>
+                                <td>{{ row[1] }}</td>
+                                <td><span class="status-present">Present</span></td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4" style="text-align:center; padding: 20px; color: var(--text-muted);">
+                                    No attendance marked yet. Start the camera!
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

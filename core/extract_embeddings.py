@@ -5,8 +5,9 @@ import os
 
 mp_face_mesh = mp.solutions.face_mesh
 
-DATASET_PATH = "dataset"
-EMBEDDING_DIR = "embeddings"
+# UPDATED: Pointing to the new organized folder location
+DATASET_PATH = "data_files/dataset"
+EMBEDDING_DIR = "data_files/embeddings"
 
 embeddings = []
 labels = []
@@ -18,6 +19,10 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 
 print("[INFO] Extracting face embeddings...")
+
+if not os.path.exists(DATASET_PATH):
+    print(f"[ERROR] Dataset folder not found at {DATASET_PATH}")
+    exit()
 
 for person_name in os.listdir(DATASET_PATH):
     person_path = os.path.join(DATASET_PATH, person_name)
@@ -49,7 +54,9 @@ for person_name in os.listdir(DATASET_PATH):
 
 embeddings = np.array(embeddings)
 
+# Create the output directory if it doesn't exist
 os.makedirs(EMBEDDING_DIR, exist_ok=True)
+
 np.save(os.path.join(EMBEDDING_DIR, "embeddings.npy"), embeddings)
 np.save(os.path.join(EMBEDDING_DIR, "labels.npy"), np.array(labels))
 

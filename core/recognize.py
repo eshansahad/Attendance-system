@@ -1,13 +1,25 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from db_utils import mark_attendance   # ✅ DATABASE LINK
+import os
+import sys
 
 # ==============================
-# Load stored face embeddings
+# UPDATED IMPORT
 # ==============================
-embeddings = np.load("embeddings/embeddings.npy")
-labels = np.load("embeddings/labels.npy")
+# Add the project root to system path so we can import from 'database'
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from database.db_utils import mark_attendance
+
+# ==============================
+# UPDATED PATHS
+# ==============================
+EMBEDDINGS_PATH = "data_files/embeddings/embeddings.npy"
+LABELS_PATH = "data_files/embeddings/labels.npy"
+
+print("[INFO] Loading encodings...")
+embeddings = np.load(EMBEDDINGS_PATH)
+labels = np.load(LABELS_PATH)
 
 # ==============================
 # MediaPipe Face Mesh
@@ -44,7 +56,7 @@ blink_counter = 0
 blink_detected = False
 
 THRESHOLD = 1.0  # Face recognition sensitivity
-attendance_marked = False  # ✅ Prevent duplicates
+attendance_marked = False  # Prevent duplicates
 
 print("[INFO] Face recognition with liveness started...")
 
@@ -88,7 +100,7 @@ while True:
             blink_counter = 0
 
         # ==============================
-        # If LIVE → recognize face
+        # If LIVE -> recognize face
         # ==============================
         if blink_detected:
             status = "Live"
@@ -104,7 +116,7 @@ while True:
             if distances[min_idx] < THRESHOLD:
                 name = labels[min_idx]
 
-                # ✅ MARK ATTENDANCE ONLY ONCE
+                # MARK ATTENDANCE ONLY ONCE
                 if not attendance_marked:
                     mark_attendance(name)
                     attendance_marked = True
