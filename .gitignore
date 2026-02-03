@@ -1,13 +1,28 @@
-mp_env/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
 
-# Database
-database/attendance.db
+# Virtual environment
+mp_env/
+env/
+venv/
 
-# Face data (DO NOT UPLOAD)
-dataset/
-embeddings/
+# Environment variables
+.env
 
-# Ignore CSV reports
-*.csv
+# Database (generated)
+database/*.db
+
+# Generated embeddings & intruders
+data_files/embeddings/*.npy
+data_files/intruders/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
