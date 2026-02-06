@@ -1,127 +1,112 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Reports & Issues - Smart Attend</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
+{% extends "base.html" %}
 
-    <div class="sidebar">
-        <div class="brand">
-            <i class="fas fa-fingerprint"></i>
-            <span>Smart</span>Attend
-        </div>
-        <ul class="menu">
-            <li><a href="/"><i class="fas fa-th-large"></i> Dashboard</a></li>
-            <li><a href="/students"><i class="fas fa-user-graduate"></i> Students</a></li>
-            <li><a href="/register"><i class="fas fa-user-plus"></i> Register</a></li>
-            <li><a href="/report" class="active"><i class="fas fa-file-alt"></i> Reports</a></li>
-            
-            <li style="margin-top: 50px; border-top: 1px solid #334155;">
-                <a href="/logout" style="color: #ef4444;"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            </li>
-        </ul>
-    </div>
+{% set active_page = "reports" %}
 
-    <div class="main-content">
-        <div class="header">
-            <h2>Reports & Issues</h2>
-            <div class="user-profile">
-                <span>Admin</span>
-                <div class="user-avatar"><i class="fas fa-user"></i></div>
-            </div>
-        </div>
+{% block title %}Reports & Issues - Smart Attend{% endblock %}
 
-        <div class="page-wrapper">
-            
-            <h3 class="page-title" style="margin-bottom: 15px; color: #ff9b44;">
-                <i class="fas fa-exclamation-circle"></i> Student Reports / Complaints
-            </h3>
-            
-            <div class="table-card" style="margin-bottom: 40px;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Student</th>
-                            <th>Date</th>
-                            <th>Issue Type</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if complaints %}
-                            {% for issue in complaints %}
-                            <tr>
-                                <td style="font-weight: bold; color: white;">{{ issue.name }}</td>
-                                <td>{{ issue.date }}</td>
-                                <td>
-                                    <span style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
-                                        {{ issue.type }}
-                                    </span>
-                                </td>
-                                <td style="color: #cbd5e1;">{{ issue.description }}</td>
-                                <td>
-                                    {% if issue.status == 'Pending' %}
-                                        <div style="display: flex; gap: 5px;">
-                                            <a href="/complaint/{{ issue.id }}/approve" class="btn" style="padding: 5px 10px; background: #10b981; color: white; font-size: 12px;" title="Approve & Fix Attendance">
-                                                <i class="fas fa-check"></i> Accept
-                                            </a>
-                                            <a href="/complaint/{{ issue.id }}/reject" class="btn" style="padding: 5px 10px; background: #ef4444; color: white; font-size: 12px;" title="Reject Claim">
-                                                <i class="fas fa-times"></i> Deny
-                                            </a>
-                                        </div>
-                                    {% elif issue.status == 'Resolved' %}
-                                        <span style="color: #10b981; font-weight: bold;"><i class="fas fa-check-circle"></i> Resolved</span>
-                                    {% else %}
-                                        <span style="color: #ef4444; font-weight: bold;"><i class="fas fa-times-circle"></i> Rejected</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="5" style="text-align:center; color: #94a3b8;">No complaints submitted.</td></tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
+{% block header_title %}
+Reports & Issues
+{% endblock %}
 
-            <h3 class="page-title" style="margin-bottom: 15px;">
-                <i class="fas fa-calendar-day"></i> Daily Attendance Log
-            </h3>
-            
-            <div class="table-card">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Status</th>
-                            <th>Time In</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in attendance_logs %}
-                        <tr>
-                            <td style="font-weight: 500;">{{ row.name }}</td>
-                            <td>
-                                {% if row.status == 'Present' %}
-                                    <span class="status-present">{{ row.status }}</span>
-                                {% else %}
-                                    <span class="status-present" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);">{{ row.status }}</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ row.time }}</td>
-                            <td>{{ row.date }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+{% block content %}
 
-        </div>
-    </div>
-</body>
-</html>
+<h3 style="margin-bottom: 15px; color: #ff9b44;">
+    <i class="fas fa-exclamation-circle"></i> Student Reports / Complaints
+</h3>
+
+<div class="table-card" style="margin-bottom: 40px;">
+    <table>
+        <thead>
+            <tr>
+                <th>Student</th>
+                <th>Date</th>
+                <th>Issue Type</th>
+                <th>Description</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if complaints %}
+            {% for issue in complaints %}
+            <tr>
+                <td style="font-weight:600;">{{ issue.name }}</td>
+                <td>{{ issue.date }}</td>
+                <td>
+                    <span style="background: rgba(59,130,246,.2); color:#60a5fa; padding:4px 8px; border-radius:4px; font-size:12px;">
+                        {{ issue.type }}
+                    </span>
+                </td>
+                <td style="color:#cbd5e1;">{{ issue.description }}</td>
+                <td>
+                    {% if issue.status == 'Pending' %}
+                        <div style="display:flex; gap:6px;">
+                            <a href="/complaint/{{ issue.id }}/approve"
+                               class="btn"
+                               style="background:#10b981; color:white; padding:6px 10px; font-size:12px;">
+                                <i class="fas fa-check"></i> Accept
+                            </a>
+                            <a href="/complaint/{{ issue.id }}/reject"
+                               class="btn"
+                               style="background:#ef4444; color:white; padding:6px 10px; font-size:12px;">
+                                <i class="fas fa-times"></i> Deny
+                            </a>
+                        </div>
+                    {% elif issue.status == 'Resolved' %}
+                        <span style="color:#10b981; font-weight:600;">
+                            <i class="fas fa-check-circle"></i> Resolved
+                        </span>
+                    {% else %}
+                        <span style="color:#ef4444; font-weight:600;">
+                            <i class="fas fa-times-circle"></i> Rejected
+                        </span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="5" style="text-align:center; color:#94a3b8;">
+                    No complaints submitted.
+                </td>
+            </tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div style="display:flex; justify-content:flex-end; margin-bottom:25px;">
+    <a href="/send_absentees" class="btn btn-primary">
+        <i class="fas fa-envelope"></i> Send Absentee Report
+    </a>
+</div>
+
+<h3 style="margin-bottom: 15px;">
+    <i class="fas fa-calendar-day"></i> Daily Attendance Log
+</h3>
+
+<div class="table-card">
+    <table>
+        <thead>
+            <tr>
+                <th>Student Name</th>
+                <th>Status</th>
+                <th>Time In</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in attendance_logs %}
+            <tr>
+                <td>{{ row.name }}</td>
+                <td style="color: {{ '#10b981' if row.status=='Present' else '#ef4444' }};">
+                    {{ row.status }}
+                </td>
+                <td>{{ row.time }}</td>
+                <td>{{ row.date }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

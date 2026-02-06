@@ -1,109 +1,218 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Student Portal - Smart Attend</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="sidebar">
-        <div class="brand"><i class="fas fa-user-graduate"></i> <span>Student</span>Panel</div>
-        <ul class="menu">
-            <li><a href="#" class="active"><i class="fas fa-home"></i> My Dashboard</a></li>
-            <li style="margin-top: 50px; border-top: 1px solid #334155;">
-                <a href="/logout" style="color: #ef4444;"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            </li>
-        </ul>
-    </div>
+{% extends "base.html" %}
 
-    <div class="main-content">
-        <div class="header">
-            <h2>Welcome, {{ student_name }}</h2>
-            <div class="user-profile"><span>Student</span></div>
+{% block title %}Student Dashboard - Smart Attend{% endblock %}
+{% block header_title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<div class="student-layout">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="card">
+            <h4>{{ my_attendance|length }}</h4>
+            <span>Days Present</span>
         </div>
 
-        <div class="page-wrapper">
-            <div class="stats-grid">
-                <div class="card">
-                    <div class="card-info"><h4>{{ my_attendance|length }}</h4><span>Days Present</span></div>
-                    <div class="card-icon bg-green"><i class="fas fa-check"></i></div>
-                </div>
-                <div class="card">
-                    <div class="card-info"><h4>{{ my_issues|length }}</h4><span>Issues Reported</span></div>
-                    <div class="card-icon bg-orange"><i class="fas fa-exclamation-circle"></i></div>
-                </div>
-            </div>
+        <div class="card">
+            <h4>{{ my_issues|length }}</h4>
+            <span>Issues Reported</span>
+        </div>
+    </div>
+    
+    <!-- Attendance Percentage -->
+    <div class="card attendance-card">
+        <h3>Attendance Percentage</h3>
 
-            <div class="grid" style="grid-template-columns: 2fr 1fr; gap: 20px;">
-                
-                <div>
-                    <div class="table-card" style="margin-bottom: 30px;">
-                        <h3 style="margin-top:0; color: #ff9b44;"><i class="fas fa-history"></i> My Reports Status</h3>
-                        <table>
-                            <thead><tr><th>Date</th><th>Issue Type</th><th>Status</th></tr></thead>
-                            <tbody>
-                                {% if my_issues %}
-                                    {% for issue in my_issues %}
-                                    <tr>
-                                        <td>{{ issue.date }}</td>
-                                        <td>{{ issue.type }}</td>
-                                        <td>
-                                            {% if issue.status == 'Resolved' %}
-                                                <span class="status-present"><i class="fas fa-check"></i> Approved</span>
-                                            {% elif issue.status == 'Rejected' %}
-                                                <span class="status-present" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);"><i class="fas fa-times"></i> Rejected</span>
-                                            {% else %}
-                                                <span style="color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">Pending</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
+        {% set total_days = my_attendance|length %}
+        {% set percentage = (total_days * 100) if total_days > 0 else 0 %}
+
+        <div class="percentage-text">
+            {{ percentage }}%
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ percentage }}%;"></div>
+        </div>
+
+        <p class="muted-text">
+            Based on recorded attendance
+        </p>
+    </div>
+
+    <!-- Attendance Streak -->
+    <div class="card">
+        <h3>Attendance Streak</h3>
+
+        {% set streak = my_attendance|length %}
+        <div class="percentage-text">
+            🔥 {{ streak }} Days
+        </div>
+
+        <p class="muted-text">
+            Continuous attendance
+        </p>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="student-grid">
+
+        <!-- LEFT COLUMN -->
+        <div>
+
+            <!-- My Reports Status -->
+            <div class="table-card">
+                <h3><i class="fas fa-history"></i> My Reports Status</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Issue Type</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% if my_issues %}
+                        {% for issue in my_issues %}
+                        <tr>
+                            <td>{{ issue.date }}</td>
+                            <td>{{ issue.type }}</td>
+                            <td>
+                                {% if issue.status == 'Resolved' %}
+                                    <span class="green">Approved</span>
+                                {% elif issue.status == 'Rejected' %}
+                                    <span style="color:#ef4444;">Rejected</span>
                                 {% else %}
-                                    <tr><td colspan="3" style="text-align:center; color: #94a3b8;">No issues reported yet.</td></tr>
+                                    <span style="color:#fbbf24;">Pending</span>
                                 {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3">
+                                <div class="empty-state">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>No issues reported yet</span>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            </div>
 
-                    <div class="table-card">
-                        <h3 style="margin-top:0;"><i class="fas fa-calendar-check"></i> Attendance History</h3>
-                        <table>
-                            <thead><tr><th>Date</th><th>Time</th><th>Status</th></tr></thead>
-                            <tbody>
-                                {% for row in my_attendance %}
-                                <tr>
-                                    <td>{{ row.date }}</td>
-                                    <td>{{ row.time }}</td>
-                                    <td><span class="status-present">Present</span></td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Attendance Trend -->
+            <div class="table-card">
+                <h3><i class="fas fa-chart-line"></i> My Attendance Trend</h3>
+                <div id="studentAttendanceChart" style="height:300px;"></div>
+
+                {% if not my_attendance %}
+                <div class="empty-state">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Attendance graph will appear once attendance is marked</span>
                 </div>
+                {% endif %}
+            </div>
 
-                <div>
-                    <div class="card" style="display: block; position: sticky; top: 20px;">
-                        <h3 style="margin-top: 0;">Report an Issue</h3>
-                        <p style="font-size: 13px; color: #94a3b8;">Marked absent incorrectly? Let the teacher know.</p>
-                        
-                        <form action="/student/report_issue" method="POST">
-                            <label style="font-size: 12px; color: var(--text-muted);">Issue Type</label>
-                            <select name="issue_type" style="width: 100%; margin-bottom: 10px;">
-                                <option value="Missing Attendance">I was present but marked absent</option>
-                                <option value="Tech Error">System/Camera Error</option>
-                            </select>
+            <!-- Attendance History -->
+            <div class="table-card">
+                <h3><i class="fas fa-calendar-check"></i> Attendance History</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in my_attendance %}
+                        <tr>
+                            <td>{{ row.date }}</td>
+                            <td>{{ row.time }}</td>
+                            <td class="green">Present</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3">
+                                <div class="empty-state">
+                                    <i class="fas fa-calendar-times"></i>
+                                    <span>No attendance records found</span>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
-                            <label style="font-size: 12px; color: var(--text-muted);">Description</label>
-                            <textarea name="description" rows="4" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; padding: 10px;" required placeholder="E.g., I was in class at 9:05 AM..."></textarea>
+        </div>
 
-                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 15px;">Submit Report</button>
-                        </form>
-                    </div>
-                </div>
+        <!-- RIGHT COLUMN -->
+        <div>
+            <div class="card sticky-card">
+                <h3>Report an Issue</h3>
+                <p class="muted-text">
+                    Marked absent incorrectly? Let the teacher know.
+                </p>
+
+                <form action="/student/report_issue" method="POST">
+                    <label>Issue Type</label>
+                    <select name="issue_type">
+                        <option value="Missing Attendance">Marked absent by mistake</option>
+                        <option value="Tech Error">System / Camera Error</option>
+                    </select>
+
+                    <label>Description</label>
+                    <textarea name="description" rows="4" required></textarea>
+
+                    <button type="submit" class="btn btn-primary full-btn">
+                        Submit Report
+                    </button>
+                </form>
             </div>
         </div>
+
     </div>
-</body>
-</html>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.highcharts.com/highcharts.js"></script>
+
+<script>
+    const dates = [
+        {% for row in my_attendance %}
+            "{{ row.date }}",
+        {% endfor %}
+    ];
+
+    const values = dates.map(() => 1); // 1 = Present
+
+    if (dates.length > 0) {
+        Highcharts.chart('studentAttendanceChart', {
+            chart: {
+                type: 'column',
+                backgroundColor: 'transparent'
+            },
+            title: { text: null },
+            xAxis: {
+                categories: dates,
+                labels: { style: { color: '#94a3b8' } }
+            },
+            yAxis: {
+                title: { text: 'Days Present' },
+                visible: false
+            },
+            tooltip: { pointFormat: '<b>Present</b>' },
+            series: [{
+                name: 'Attendance',
+                data: values,
+                color: '#10b981'
+            }],
+            credits: { enabled: false }
+        });
+    }
+</script>
+{% endblock %}

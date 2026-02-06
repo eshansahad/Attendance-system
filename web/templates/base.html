@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Smart Attend{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Fonts & Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+
+<!-- 🌈 BACKGROUND EFFECT -->
+<div class="rainbow-wrapper">
+    {% for i in range(6) %}
+        <div class="rainbow"></div>
+    {% endfor %}
+    <div class="h"></div>
+    <div class="v"></div>
+</div>
+
+<!-- ================= SIDEBAR ================= -->
+<div class="sidebar">
+    <div class="brand">
+        <i class="fas fa-fingerprint"></i>
+        <span>Smart</span>Attend
+    </div>
+    <ul class="menu">
+    {% if session.role == 'teacher' %}
+        <li><a href="/" class="{% if active_page=='dashboard' %}active{% endif %}">
+            <i class="fas fa-th-large"></i> Dashboard</a></li>
+
+        <li><a href="/students" class="{% if active_page=='students' %}active{% endif %}">
+            <i class="fas fa-user-graduate"></i> Students</a></li>
+
+        <li><a href="/register" class="{% if active_page=='register' %}active{% endif %}">
+            <i class="fas fa-user-plus"></i> Register</a></li>
+
+        <li><a href="/report" class="{% if active_page=='reports' %}active{% endif %}">
+            <i class="fas fa-file-alt"></i> Reports</a></li>
+            
+    {% elif session.role == 'student' %}
+
+        <li><a href="/student_dashboard" class="active">
+            <i class="fas fa-home"></i> My Dashboard</a></li>
+            
+    {% endif %}
+
+    <li style="margin-top:50px;border-top:1px solid #334155;">
+        <a href="/logout" style="color:#ef4444;">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </li>
+</ul>
+
+</div>
+
+<!-- ================= MAIN CONTENT ================= -->
+<div class="main-content">
+
+    <!-- Header -->
+    <div class="header">
+        <h2>{% block header_title %}Dashboard{% endblock %}</h2>
+        <div class="user-profile">
+            <span>Admin</span>
+            <div class="user-avatar"><i class="fas fa-user"></i></div>
+        </div>
+    </div>
+
+    <!-- Page Content -->
+    <div class="page-wrapper">
+        {% block content %}{% endblock %}
+    </div>
+
+</div>
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

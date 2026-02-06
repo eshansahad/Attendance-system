@@ -1,124 +1,131 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Attendance Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
+{% extends "base.html" %}
 
-    <div class="sidebar">
-        <div class="brand">
-            <i class="fas fa-fingerprint"></i>
-            <span>Smart</span>Attend
-        </div>
-        <ul class="menu">
-            <li><a href="/" class="active"><i class="fas fa-th-large"></i> Dashboard</a></li>
-            <li><a href="/students"><i class="fas fa-user-graduate"></i> Students</a></li>
-            <li><a href="/register"><i class="fas fa-user-plus"></i> Register</a></li>
-            <li><a href="/report"><i class="fas fa-file-alt"></i> Reports</a></li>
-            
-            <li style="margin-top: 50px; border-top: 1px solid #334155;">
-                <a href="/logout" style="color: #ef4444;"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            </li>
-        </ul>
+{% block title %}
+Teacher Dashboard
+{% endblock %}
+
+{% block header_title %}
+Teacher Dashboard
+{% endblock %}
+
+{% block content %}
+
+<!-- Welcome -->
+<div class="welcome-banner">
+    <div class="user-avatar orange">
+        <i class="fas fa-user-graduate"></i>
+    </div>
+    <div class="welcome-text">
+        <h3>Welcome Back, Teacher!</h3>
+        <p>System is monitoring <strong>{{ intruders|length }}</strong> security alerts.</p>
+    </div>
+    <a href="/start_camera" class="btn btn-primary">
+        <i class="fas fa-camera"></i> Start Attendance
+    </a>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="card">
+        <h4>120</h4><span>Total Students</span>
+    </div>
+    <div class="card">
+        <h4>{{ attendance|length }}</h4><span>Present Today</span>
+    </div>
+    <div class="card danger">
+        <h4>{{ intruders|length }}</h4><span>Security Alerts</span>
+    </div>
+    <div class="card">
+        <h4>95%</h4><span>Efficiency</span>
+    </div>
+</div>
+
+<!-- Attendance Trend -->
+<div class="table-card">
+    <h3><i class="fas fa-chart-line"></i> Attendance Trend (Last 7 Days)</h3>
+    <div id="attendanceChart" style="height:350px;"></div>
+</div>
+
+<!-- Attendance Table -->
+<div class="table-card">
+    <h3>Today's Attendance</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Student Name</th>
+                <th>Time In</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if attendance %}
+            {% for row in attendance %}
+            <tr>
+                <td>{{ row[0] }}</td>
+                <td>{{ row[2] }}</td>
+                <td class="green">Present</td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="3" style="text-align:center;">No one present yet.</td>
+            </tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Security Alerts -->
+<div class="table-card alert">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3><i class="fas fa-shield-alt"></i> Security Alerts</h3>
+        {% if intruders %}
+        <a href="/clear_intruders" class="btn btn-primary" style="background:#ef4444;">
+            <i class="fas fa-trash"></i> Clear All
+        </a>
+        {% endif %}
     </div>
 
-    <div class="main-content">
-        
-        <div class="header">
-            <h2>Teacher Dashboard</h2>
-            <div class="user-profile">
-                <span>Admin</span>
-                <div class="user-avatar"><i class="fas fa-user"></i></div>
-            </div>
+    {% if intruders %}
+    <div class="security-grid">
+        {% for intruder in intruders %}
+        <div class="intruder-card">
+            <img src="{{ url_for('serve_intruder', filename=intruder.filename) }}"alt="Intruder"style="width:100%; border-radius:10px;">
+            <p>UNKNOWN</p>
         </div>
-
-        <div class="page-wrapper">
-            
-            <div class="welcome-banner">
-                <div class="user-avatar" style="width: 50px; height: 50px; background: #ff9b44; color: white;">
-                    <i class="fas fa-user-graduate fa-lg"></i>
-                </div>
-                <div class="welcome-text">
-                    <h3>Welcome Back, Teacher!</h3>
-                    <p>You have <strong>2</strong> classes pending attendance today.</p>
-                </div>
-                <div style="margin-left: auto;">
-                    <a href="/start_camera" class="btn btn-primary"><i class="fas fa-camera"></i> Start Attendance</a>
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="card">
-                    <div class="card-info">
-                        <h4>120</h4>
-                        <span>Total Students</span>
-                    </div>
-                    <div class="card-icon bg-orange"><i class="fas fa-users"></i></div>
-                </div>
-                <div class="card">
-                    <div class="card-info">
-                        <h4>{{ attendance|length }}</h4>
-                        <span>Present Today</span>
-                    </div>
-                    <div class="card-icon bg-green"><i class="fas fa-check"></i></div>
-                </div>
-                <div class="card">
-                    <div class="card-info">
-                        <h4>12</h4>
-                        <span>Absent</span>
-                    </div>
-                    <div class="card-icon bg-blue"><i class="fas fa-user-times"></i></div>
-                </div>
-                <div class="card">
-                    <div class="card-info">
-                        <h4>95%</h4>
-                        <span>Attendance Rate</span>
-                    </div>
-                    <div class="card-icon bg-purple"><i class="fas fa-chart-line"></i></div>
-                </div>
-            </div>
-
-            <div class="table-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin:0; font-size: 18px;">Today's Attendance</h3>
-                    <a href="/export" class="btn" style="background:#334155; color:white;">Download CSV</a>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Time In</th>
-                            <th>Date</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if attendance %}
-                            {% for row in attendance %}
-                            <tr>
-                                <td style="font-weight: bold;">{{ row[0] }}</td>
-                                <td>{{ row[2] }}</td>
-                                <td>{{ row[1] }}</td>
-                                <td><span class="status-present">Present</span></td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="4" style="text-align:center; padding: 20px; color: var(--text-muted);">
-                                    No attendance marked yet. Start the camera!
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
+        {% endfor %}
     </div>
+    {% else %}
+    <p class="center green">No security threats detected.</p>
+    {% endif %}
+</div>
 
-</body>
-</html>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script>
+Highcharts.chart('attendanceChart', {
+    chart: {
+        type: 'spline',
+        backgroundColor: 'transparent'
+    },
+    title: { text: null },
+    xAxis: {
+        categories: {{ chart_labels | safe }},
+        labels: { style: { color: '#94a3b8' } }
+    },
+    yAxis: {
+        title: { text: 'Attendance %' },
+        max: 100
+    },
+    tooltip: { valueSuffix: '%' },
+    series: [{
+        name: 'Attendance',
+        data: {{ chart_data | safe }},
+        color: '#ff9b44'
+    }],
+    credits: { enabled: false }
+});
+</script>
+{% endblock %}

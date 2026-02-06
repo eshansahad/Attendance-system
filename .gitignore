@@ -1,25 +1,23 @@
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
 
 # Virtual environment
-mp_env/
-env/
 venv/
+.env/
 
-# Environment variables
-.env
-
-# Database (generated)
+# Database
 database/*.db
+database/*.sqlite3
 
-# Generated embeddings & intruders
-data_files/embeddings/*.npy
+# AI generated data
+data_files/dataset/
 data_files/intruders/
+data_files/embeddings/*.npy
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 

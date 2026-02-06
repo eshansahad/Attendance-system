@@ -1,22 +1,30 @@
 import sys
+import subprocess
+import os
+import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+
 
 print("===== Attendance System =====")
 print("1. Register Student Face")
 print("2. Face Detection (Recognition)")
 print("3. Open Dashboard")
 
-choice = input("Enter your choice: ")
+choice = input("Enter your choice: ").strip()
 
 if choice == "1":
-    # Looks inside 'core' folder
-    from core import face_register
+    print("[INFO] Starting Face Registration...")
+    subprocess.run([sys.executable, "core/face_register.py"])
+
 elif choice == "2":
-    # Looks inside 'core' folder
-    from core import recognize
+    print("[INFO] Starting Face Recognition...")
+    subprocess.run([sys.executable, "core/recognize.py"])
+
 elif choice == "3":
-    # Looks inside 'web' folder and STARTS the server
-    from web import dashboard
-    print("Starting Web Dashboard...")
-    dashboard.app.run(debug=True)
+    print("[INFO] Starting Web Dashboard...")
+    subprocess.run([sys.executable, "web/dashboard.py"])
+
 else:
-    print("Invalid choice")
+    print("[ERROR] Invalid choice")
