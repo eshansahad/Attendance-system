@@ -4,9 +4,16 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Virtual environment
+# Virtual environments
 venv/
+.venv/
+mp_env/
 .env/
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Database
 database/*.db

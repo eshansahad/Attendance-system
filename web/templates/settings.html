@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+{% block header_title %}System Settings{% endblock %}
+
+{% block content %}
+
+<div class="table-card" style="max-width:560px;">
+    <h3><i class="fas fa-cog"></i> Attendance Settings</h3>
+    <p class="muted-text" style="margin-bottom:24px;">
+        These settings apply to all future attendance records.
+        Already-saved records are not changed retroactively.
+    </p>
+
+    <form method="POST" action="/settings">
+
+        <label>Late Arrival Cutoff</label>
+        <p class="muted-text" style="margin:-4px 0 6px;">
+            Students checked in after this time are marked <strong>Late</strong>
+            instead of Present.
+        </p>
+        <input type="time" name="late_cutoff" value="{{ current.late_cutoff }}"
+               required
+               style="width:100%;padding:10px 12px;border-radius:10px;
+                      background:rgba(255,255,255,0.05);
+                      border:1px solid var(--glass-border);
+                      color:var(--text-primary);font-family:inherit;
+                      margin-bottom:20px;">
+
+        <label>Absence Alert Threshold (%)</label>
+        <p class="muted-text" style="margin:-4px 0 6px;">
+            Students whose attendance drops below this percentage will be
+            flagged in the teacher dashboard and their own dashboard.
+        </p>
+        <input type="number" name="absent_threshold"
+               value="{{ current.absent_threshold }}"
+               min="0" max="100" step="1" required
+               style="width:100%;padding:10px 12px;border-radius:10px;
+                      background:rgba(255,255,255,0.05);
+                      border:1px solid var(--glass-border);
+                      color:var(--text-primary);font-family:inherit;
+                      margin-bottom:20px;">
+
+        <label>Default Session Name</label>
+        <p class="muted-text" style="margin:-4px 0 6px;">
+            The session label applied when marking attendance (e.g. "Morning",
+            "CS-101", "General").
+        </p>
+        <input type="text" name="session_name"
+               value="{{ current.session_name }}"
+               maxlength="60"
+               style="width:100%;padding:10px 12px;border-radius:10px;
+                      background:rgba(255,255,255,0.05);
+                      border:1px solid var(--glass-border);
+                      color:var(--text-primary);font-family:inherit;
+                      margin-bottom:28px;">
+
+        <button type="submit" class="btn btn-primary full-btn">
+            <i class="fas fa-save"></i> Save Settings
+        </button>
+    </form>
+</div>
+
+{% endblock %}

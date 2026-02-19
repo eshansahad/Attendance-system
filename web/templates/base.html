@@ -5,18 +5,14 @@
     <title>{% block title %}Smart Attend{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Fonts & Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-
-    <!-- Main CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
     {% block extra_head %}{% endblock %}
 </head>
 
 <body>
 
-<!-- 🌈 BACKGROUND EFFECT -->
+<!-- 🌈 Background -->
 <div class="rainbow-wrapper">
     {% for i in range(6) %}
         <div class="rainbow"></div>
@@ -25,12 +21,13 @@
     <div class="v"></div>
 </div>
 
-<!-- ================= SIDEBAR ================= -->
+<!-- ─── SIDEBAR ─────────────────────────────────────────────────────────── -->
 <div class="sidebar">
     <div class="brand">
         <i class="fas fa-fingerprint"></i>
         <span>Smart</span>Attend
     </div>
+
     <ul class="menu">
     {% if session.role == 'teacher' %}
         <li><a href="/" class="{% if active_page=='dashboard' %}active{% endif %}">
@@ -44,43 +41,61 @@
 
         <li><a href="/report" class="{% if active_page=='reports' %}active{% endif %}">
             <i class="fas fa-file-alt"></i> Reports</a></li>
-            
-    {% elif session.role == 'student' %}
 
-        <li><a href="/student_dashboard" class="active">
+        <li><a href="/settings" class="{% if active_page=='settings' %}active{% endif %}">
+            <i class="fas fa-cog"></i> Settings</a></li>
+
+        <li><a href="/complaints" class="{% if active_page=='complaints' %}active{% endif %}">
+            <i class="fas fa-flag"></i> Complaints</a></li>
+
+    {% elif session.role == 'student' %}
+        <li><a href="/student_dashboard" class="{% if active_page=='student_home' %}active{% endif %}">
             <i class="fas fa-home"></i> My Dashboard</a></li>
-            
+
+        <li><a href="/complaint/new" class="{% if active_page=='complaints' %}active{% endif %}">
+            <i class="fas fa-flag"></i> File Complaint</a></li>
+
+        <li><a href="/complaint/my" class="{% if active_page=='my_complaints' %}active{% endif %}">
+            <i class="fas fa-list"></i> My Complaints</a></li>
     {% endif %}
 
-    <li style="margin-top:50px;border-top:1px solid #334155;">
+    <li style="margin-top:auto;border-top:1px solid var(--glass-border);padding-top:8px;">
         <a href="/logout" style="color:#ef4444;">
             <i class="fas fa-sign-out-alt"></i> Logout
         </a>
     </li>
-</ul>
-
+    </ul>
 </div>
 
-<!-- ================= MAIN CONTENT ================= -->
+<!-- ─── MAIN CONTENT ─────────────────────────────────────────────────────── -->
 <div class="main-content">
 
-    <!-- Header -->
     <div class="header">
-        <h2>{% block header_title %}Dashboard{% endblock %}</h2>
-        <div class="user-profile">
-            <span>Admin</span>
+        <h2 style="margin:0;font-size:18px;">{% block header_title %}Dashboard{% endblock %}</h2>
+        <div class="user-profile" style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:14px;color:var(--text-muted);">
+                {{ session.user_name or ("Teacher" if session.role=="teacher" else "Student") }}
+            </span>
             <div class="user-avatar"><i class="fas fa-user"></i></div>
         </div>
     </div>
 
-    <!-- Page Content -->
     <div class="page-wrapper">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, msg in messages %}
+                <div class="flash-msg flash-{{ category }}">
+                    <i class="fas fa-info-circle"></i> {{ msg }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         {% block content %}{% endblock %}
     </div>
 
 </div>
 
 {% block scripts %}{% endblock %}
-
 </body>
 </html>

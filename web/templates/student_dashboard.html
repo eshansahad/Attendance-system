@@ -1,218 +1,235 @@
 {% extends "base.html" %}
 
-{% block title %}Student Dashboard - Smart Attend{% endblock %}
-{% block header_title %}Student Dashboard{% endblock %}
+{% block title %}My Dashboard{% endblock %}
+{% block header_title %}My Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
 
 {% block content %}
-<div class="student-layout">
 
-    <!-- Stats -->
-    <div class="stats-grid">
-        <div class="card">
-            <h4>{{ my_attendance|length }}</h4>
-            <span>Days Present</span>
-        </div>
-
-        <div class="card">
-            <h4>{{ my_issues|length }}</h4>
-            <span>Issues Reported</span>
-        </div>
+<div class="welcome-banner" style="margin-bottom:24px;">
+    <div class="user-avatar orange">
+        <i class="fas fa-user-graduate"></i>
     </div>
-    
-    <!-- Attendance Percentage -->
+    <div class="welcome-text">
+        <h3>Hello, {{ student_name }}!</h3>
+        <p>Here's your attendance summary.</p>
+    </div>
+</div>
+
+{% if stats.below_threshold %}
+<div class="alert-warning">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>
+        <strong>Low Attendance Warning</strong>
+        <p>Your attendance is {{ stats.percentage }}%, which is below the required
+           {{ stats.threshold|int }}%. Please attend more classes to avoid issues.</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="stats-grid" style="margin-bottom:28px;">
+    <div class="card" style="border-left:4px solid #10b981;">
+        <span>Present</span>
+        <h4 style="color:#10b981;">{{ stats.present }}</h4>
+    </div>
+    <div class="card" style="border-left:4px solid #f59e0b;">
+        <span>Late</span>
+        <h4 style="color:#f59e0b;">{{ stats.late }}</h4>
+    </div>
+    <div class="card" style="border-left:4px solid #ef4444;">
+        <span>Absent</span>
+        <h4 style="color:#ef4444;">{{ stats.absent }}</h4>
+    </div>
     <div class="card attendance-card">
-        <h3>Attendance Percentage</h3>
-
-        {% set total_days = my_attendance|length %}
-        {% set percentage = (total_days * 100) if total_days > 0 else 0 %}
-
-        <div class="percentage-text">
-            {{ percentage }}%
+        <span>Overall</span>
+        <div class="percentage-text"
+             style="color:{% if stats.below_threshold %}#ef4444{% else %}#ff9b44{% endif %};">
+            {{ stats.percentage }}%
         </div>
-
         <div class="progress-bar">
-            <div class="progress-fill" style="width: {{ percentage }}%;"></div>
-        </div>
-
-        <p class="muted-text">
-            Based on recorded attendance
-        </p>
-    </div>
-
-    <!-- Attendance Streak -->
-    <div class="card">
-        <h3>Attendance Streak</h3>
-
-        {% set streak = my_attendance|length %}
-        <div class="percentage-text">
-            🔥 {{ streak }} Days
-        </div>
-
-        <p class="muted-text">
-            Continuous attendance
-        </p>
-    </div>
-
-    <!-- Main Grid -->
-    <div class="student-grid">
-
-        <!-- LEFT COLUMN -->
-        <div>
-
-            <!-- My Reports Status -->
-            <div class="table-card">
-                <h3><i class="fas fa-history"></i> My Reports Status</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Issue Type</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% if my_issues %}
-                        {% for issue in my_issues %}
-                        <tr>
-                            <td>{{ issue.date }}</td>
-                            <td>{{ issue.type }}</td>
-                            <td>
-                                {% if issue.status == 'Resolved' %}
-                                    <span class="green">Approved</span>
-                                {% elif issue.status == 'Rejected' %}
-                                    <span style="color:#ef4444;">Rejected</span>
-                                {% else %}
-                                    <span style="color:#fbbf24;">Pending</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="3">
-                                <div class="empty-state">
-                                    <i class="fas fa-check-circle"></i>
-                                    <span>No issues reported yet</span>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endif %}
-                    </tbody>
-                </table>
+            <div class="progress-fill" style="width:{{ stats.percentage }}%;
+                 background:{% if stats.below_threshold %}linear-gradient(90deg,#ef4444,#f97316){% else %}linear-gradient(90deg,#ff9b44,#03a9f4){% endif %};">
             </div>
+        </div>
+        <p class="muted-text">{{ stats.total }} school day{{ stats.total != 1 and "s" or "" }} tracked</p>
+    </div>
+</div>
 
-            <!-- Attendance Trend -->
-            <div class="table-card">
-                <h3><i class="fas fa-chart-line"></i> My Attendance Trend</h3>
-                <div id="studentAttendanceChart" style="height:300px;"></div>
+<div class="student-grid">
 
-                {% if not my_attendance %}
-                <div class="empty-state">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Attendance graph will appear once attendance is marked</span>
+    <!-- Calendar -->
+    <div>
+        <div class="table-card">
+
+            <!-- Header with navigation -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+                <h3 style="margin:0;"><i class="fas fa-calendar-alt"></i> {{ month_year }}</h3>
+
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <!-- Prev month -->
+                    <a href="/student_dashboard?year={{ prev_year }}&month={{ prev_month }}"
+                       class="cal-nav-btn" title="Previous month">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+
+                    <!-- Month + Year dropdowns -->
+                    <form method="GET" action="/student_dashboard"
+                          style="display:flex;gap:6px;align-items:center;">
+                        <select name="month" onchange="this.form.submit()"
+                                style="padding:5px 10px;border-radius:8px;
+                                       background:rgba(255,255,255,0.06);
+                                       border:1px solid var(--glass-border);
+                                       color:var(--text-primary);
+                                       font-family:inherit;font-size:13px;cursor:pointer;">
+                            {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>
+                                {{ month_names[m-1] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <select name="year" onchange="this.form.submit()"
+                                style="padding:5px 10px;border-radius:8px;
+                                       background:rgba(255,255,255,0.06);
+                                       border:1px solid var(--glass-border);
+                                       color:var(--text-primary);
+                                       font-family:inherit;font-size:13px;cursor:pointer;">
+                            {% for y in year_range %}
+                            <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>
+                                {{ y }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+
+                    <!-- Next month -->
+                    <a href="/student_dashboard?year={{ next_year }}&month={{ next_month }}"
+                       class="cal-nav-btn" title="Next month">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+
+                    <!-- Back to today -->
+                    <a href="/student_dashboard" class="cal-nav-btn" title="Go to today"
+                       style="font-size:11px;padding:6px 10px;width:auto;border-radius:8px;">
+                        Today
+                    </a>
                 </div>
-                {% endif %}
             </div>
 
-            <!-- Attendance History -->
-            <div class="table-card">
-                <h3><i class="fas fa-calendar-check"></i> Attendance History</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Time</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for row in my_attendance %}
-                        <tr>
-                            <td>{{ row.date }}</td>
-                            <td>{{ row.time }}</td>
-                            <td class="green">Present</td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="3">
-                                <div class="empty-state">
-                                    <i class="fas fa-calendar-times"></i>
-                                    <span>No attendance records found</span>
-                                </div>
-                            </td>
-                        </tr>
+            <!-- Legend -->
+            <div class="cal-legend">
+                <span><span class="cal-dot present"></span> Present</span>
+                <span><span class="cal-dot late"></span> Late</span>
+                <span><span class="cal-dot absent"></span> Absent</span>
+                <span><span class="cal-dot no-class"></span> No class</span>
+                <span><span class="cal-dot future"></span> Upcoming</span>
+            </div>
+
+            <!-- Grid -->
+            <div class="cal-grid">
+                {% for day in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
+                    <div class="cal-header">{{ day }}</div>
+                {% endfor %}
+
+                {% for week in cal_weeks %}
+                    {% for cell in week %}
+                        {% if cell is none %}
+                            <div class="cal-cell empty"></div>
+                        {% else %}
+                            <div class="cal-cell {{ cell.status }}"
+                                 title="{{ cell.date }} – {{ cell.status|capitalize }}">
+                                {{ cell.day }}
+                            </div>
+                        {% endif %}
                     {% endfor %}
-                    </tbody>
-                </table>
+                {% endfor %}
             </div>
 
         </div>
+    </div>
 
-        <!-- RIGHT COLUMN -->
-        <div>
-            <div class="card sticky-card">
-                <h3>Report an Issue</h3>
-                <p class="muted-text">
-                    Marked absent incorrectly? Let the teacher know.
-                </p>
-
-                <form action="/student/report_issue" method="POST">
-                    <label>Issue Type</label>
-                    <select name="issue_type">
-                        <option value="Missing Attendance">Marked absent by mistake</option>
-                        <option value="Tech Error">System / Camera Error</option>
-                    </select>
-
-                    <label>Description</label>
-                    <textarea name="description" rows="4" required></textarea>
-
-                    <button type="submit" class="btn btn-primary full-btn">
-                        Submit Report
-                    </button>
-                </form>
+    <!-- Right column -->
+    <div>
+        <div class="table-card sticky-card" style="margin-bottom:24px;">
+            <h3><i class="fas fa-chart-pie"></i> Breakdown</h3>
+            {% if stats.total > 0 %}
+            <div style="position:relative;width:100%;max-width:220px;margin:0 auto;">
+                <canvas id="donutChart"></canvas>
+                <div class="donut-center-label">
+                    <span>{{ stats.percentage }}%</span>
+                    <small>attended</small>
+                </div>
             </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <span>No attendance data yet.</span>
+            </div>
+            {% endif %}
         </div>
 
+        <div class="table-card">
+            <h3><i class="fas fa-history"></i> Recent Check-ins</h3>
+            {% if recent %}
+            <table style="font-size:13px;">
+                <thead>
+                    <tr><th>Date</th><th>Time</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for r in recent %}
+                    <tr>
+                        <td>{{ r["date"] }}</td>
+                        <td>{{ r["time"][:5] }}</td>
+                        <td>
+                            {% if r["status"] == "Present" %}
+                                <span class="badge badge-present">Present</span>
+                            {% elif r["status"] == "Late" %}
+                                <span class="badge badge-late">Late</span>
+                            {% else %}
+                                <span class="badge badge-absent">{{ r["status"] }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-check"></i>
+                <span>No records yet.</span>
+            </div>
+            {% endif %}
+        </div>
     </div>
 
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://code.highcharts.com/highcharts.js"></script>
-
 <script>
-    const dates = [
-        {% for row in my_attendance %}
-            "{{ row.date }}",
-        {% endfor %}
-    ];
-
-    const values = dates.map(() => 1); // 1 = Present
-
-    if (dates.length > 0) {
-        Highcharts.chart('studentAttendanceChart', {
-            chart: {
-                type: 'column',
-                backgroundColor: 'transparent'
-            },
-            title: { text: null },
-            xAxis: {
-                categories: dates,
-                labels: { style: { color: '#94a3b8' } }
-            },
-            yAxis: {
-                title: { text: 'Days Present' },
-                visible: false
-            },
-            tooltip: { pointFormat: '<b>Present</b>' },
-            series: [{
-                name: 'Attendance',
-                data: values,
-                color: '#10b981'
-            }],
-            credits: { enabled: false }
-        });
+{% if stats.total > 0 %}
+new Chart(document.getElementById('donutChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Present', 'Late', 'Absent'],
+        datasets: [{
+            data: [{{ stats.present }}, {{ stats.late }}, {{ stats.absent }}],
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+            borderWidth: 0,
+            hoverOffset: 6
+        }]
+    },
+    options: {
+        cutout: '72%',
+        plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 14,
+                font: { family: 'Plus Jakarta Sans', size: 12 } } },
+            tooltip: { backgroundColor: '#0f172a', titleColor: '#f8fafc', bodyColor: '#94a3b8' }
+        }
     }
+});
+{% endif %}
 </script>
 {% endblock %}

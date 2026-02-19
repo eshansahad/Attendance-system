@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}My Complaints{% endblock %}
+{% block header_title %}My Complaints{% endblock %}
+
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, msg in messages %}
+        <div class="flash-msg flash-{{ category }}">
+            <i class="fas fa-info-circle"></i> {{ msg }}
+        </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div style="display:flex;justify-content:space-between;align-items:center;
+            flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+    <div>
+        <p class="muted-text" style="margin:0;">
+            All complaints you've filed are listed here.
+        </p>
+    </div>
+    <a href="/complaint/new" class="btn btn-primary">
+        <i class="fas fa-plus"></i> New Complaint
+    </a>
+</div>
+
+{% if complaints %}
+
+<!-- Status summary pills -->
+{% set pending  = complaints | selectattr("status","equalto","Pending")  | list | length %}
+{% set accepted = complaints | selectattr("status","equalto","Accepted") | list | length %}
+{% set declined = complaints | selectattr("status","equalto","Declined") | list | length %}
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+    <div class="status-pill" style="background:rgba(245,158,11,.15);
+         border:1px solid rgba(245,158,11,.3);color:#f59e0b;">
+        <i class="fas fa-clock"></i> {{ pending }} Pending
+    </div>
+    <div class="status-pill" style="background:rgba(16,185,129,.15);
+         border:1px solid rgba(16,185,129,.3);color:#10b981;">
+        <i class="fas fa-check-circle"></i> {{ accepted }} Accepted
+    </div>
+    <div class="status-pill" style="background:rgba(239,68,68,.15);
+         border:1px solid rgba(239,68,68,.3);color:#ef4444;">
+        <i class="fas fa-times-circle"></i> {{ declined }} Declined
+    </div>
+</div>
+
+<!-- Complaint cards -->
+{% for c in complaints %}
+<div class="complaint-card
+    {% if c.status == 'Accepted' %}complaint-accepted
+    {% elif c.status == 'Declined' %}complaint-declined
+    {% else %}complaint-pending{% endif %}">
+
+    <!-- Top row: date + status badge -->
+    <div class="complaint-header">
+        <div>
+            <span class="complaint-date">
+                <i class="fas fa-calendar-day"></i> {{ c.date }}
+            </span>
+            <span class="complaint-reason">{{ c.reason }}</span>
+        </div>
+        <div>
+            {% if c.status == 'Pending' %}
+                <span class="badge badge-late">
+                    <i class="fas fa-clock"></i> Pending
+                </span>
+            {% elif c.status == 'Accepted' %}
+                <span class="badge badge-present">
+                    <i class="fas fa-check-circle"></i> Accepted
+                </span>
+            {% else %}
+                <span class="badge badge-absent">
+                    <i class="fas fa-times-circle"></i> Declined
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Description -->
+    <p class="complaint-desc">{{ c.description }}</p>
+
+    <!-- Teacher reply (if resolved) -->
+    {% if c.teacher_note %}
+    <div class="teacher-reply">
+        <i class="fas fa-chalkboard-teacher"></i>
+        <div>
+            <strong>Teacher's Note:</strong>
+            <p>{{ c.teacher_note }}</p>
+        </div>
+    </div>
+    {% elif c.status != 'Pending' %}
+    <div class="teacher-reply" style="opacity:.5;">
+        <i class="fas fa-chalkboard-teacher"></i>
+        <div><strong>Teacher's Note:</strong> <p>No note added.</p></div>
+    </div>
+    {% endif %}
+
+    <!-- Footer: submitted / resolved timestamps -->
+    <div class="complaint-footer">
+        <span><i class="fas fa-paper-plane"></i> Submitted: {{ c.created_at[:16] }}</span>
+        {% if c.resolved_at %}
+        <span><i class="fas fa-check"></i> Resolved: {{ c.resolved_at[:16] }}</span>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="table-card">
+    <div class="empty-state">
+        <i class="fas fa-flag"></i>
+        <span>You haven't filed any complaints yet.</span>
+        <a href="/complaint/new" class="btn btn-primary" style="margin-top:14px;">
+            <i class="fas fa-plus"></i> File First Complaint
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

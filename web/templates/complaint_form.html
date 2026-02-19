@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}File a Complaint{% endblock %}
+{% block header_title %}File a Complaint{% endblock %}
+
+{% block content %}
+
+<!-- Flash messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, msg in messages %}
+        <div class="flash-msg flash-{{ category }}">
+            <i class="fas fa-info-circle"></i> {{ msg }}
+        </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+    <a href="/complaint/my" class="btn btn-primary"
+       style="background:rgba(255,255,255,0.08);">
+        <i class="fas fa-list"></i> My Complaints
+    </a>
+</div>
+
+<div class="table-card" style="max-width:600px;">
+    <h3><i class="fas fa-flag"></i> Submit Attendance Complaint</h3>
+    <p class="muted-text" style="margin-bottom:20px;">
+        Use this form if you were absent on a day but had a valid reason —
+        such as a camera error, network issue, or medical emergency.
+        Your teacher will review and respond.
+    </p>
+
+    <form method="POST" action="/complaint/new">
+
+        <label>Date of Absence <span style="color:#ef4444;">*</span></label>
+        <input type="date" name="date"
+               value="{{ prefill_date }}"
+               max="{{ today }}"
+               required
+               style="width:100%;padding:10px 12px;border-radius:10px;
+                      background:rgba(255,255,255,0.05);
+                      border:1px solid var(--glass-border);
+                      color:var(--text-primary);font-family:inherit;
+                      font-size:14px;margin-bottom:4px;">
+        <p class="muted-text">Select the date you were marked absent.</p>
+
+        <label>Reason <span style="color:#ef4444;">*</span></label>
+        <select name="reason" required>
+            <option value="" disabled selected>Select a reason...</option>
+            <option value="Camera not working">Camera not working</option>
+            <option value="Network/connection issue">Network / connection issue</option>
+            <option value="Medical emergency">Medical emergency</option>
+            <option value="Power outage">Power outage</option>
+            <option value="Late arrival (before cutoff)">Late arrival (before cutoff)</option>
+            <option value="System error">System error</option>
+            <option value="Other">Other</option>
+        </select>
+        <p class="muted-text">Choose the closest matching reason.</p>
+
+        <label>Description <span style="color:#ef4444;">*</span></label>
+        <textarea name="description" rows="5" required
+                  maxlength="500"
+                  placeholder="Explain what happened in detail. The more specific you are, the faster your teacher can review this."></textarea>
+        <p class="muted-text">Max 500 characters.</p>
+
+        <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center;">
+                <i class="fas fa-paper-plane"></i> Submit Complaint
+            </button>
+            <a href="/student_dashboard" class="btn btn-primary"
+               style="flex:1;justify-content:center;background:rgba(255,255,255,0.06);">
+                <i class="fas fa-arrow-left"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Set max date to today
+document.querySelector('input[name="date"]').max =
+    new Date().toISOString().split('T')[0];
+</script>
+{% endblock %}

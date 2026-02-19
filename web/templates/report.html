@@ -1,112 +1,179 @@
 {% extends "base.html" %}
 
-{% set active_page = "reports" %}
-
-{% block title %}Reports & Issues - Smart Attend{% endblock %}
-
-{% block header_title %}
-Reports & Issues
-{% endblock %}
+{% block title %}Attendance Report{% endblock %}
+{% block header_title %}Attendance Report{% endblock %}
 
 {% block content %}
 
-<h3 style="margin-bottom: 15px; color: #ff9b44;">
-    <i class="fas fa-exclamation-circle"></i> Student Reports / Complaints
-</h3>
+<!-- Header controls -->
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;">
 
-<div class="table-card" style="margin-bottom: 40px;">
+    <!-- Date picker -->
+    <form method="GET" action="/report" style="display:flex;gap:10px;align-items:center;">
+        <label style="color:var(--text-muted);font-size:13px;margin:0;">Date:</label>
+        <input type="date" name="date" value="{{ report_date }}"
+               style="padding:8px 12px;border-radius:10px;
+                      background:rgba(255,255,255,0.05);
+                      border:1px solid var(--glass-border);
+                      color:var(--text-primary);font-family:inherit;cursor:pointer;">
+        <button type="submit" class="btn btn-primary" style="padding:8px 18px;">
+            <i class="fas fa-search"></i> Filter
+        </button>
+    </form>
+
+    <!-- Export -->
+    <a href="/export_report?date={{ report_date }}" class="btn btn-primary"
+       style="background:#10b981;">
+        <i class="fas fa-download"></i> Export CSV
+    </a>
+</div>
+
+<!-- Summary cards for this date -->
+{% set present_count = attendance_logs | selectattr("status", "equalto", "Present") | list | length %}
+{% set late_count    = attendance_logs | selectattr("status", "equalto", "Late")    | list | length %}
+{% set absent_count  = attendance_logs | selectattr("status", "equalto", "Absent")  | list | length %}
+{% set total         = attendance_logs | length %}
+
+<div class="stats-grid" style="margin-bottom:28px;">
+    <div class="card" style="border-left:4px solid #10b981;">
+        <span>Present</span><h4 style="color:#10b981;">{{ present_count }}</h4>
+    </div>
+    <div class="card" style="border-left:4px solid #f59e0b;">
+        <span>Late</span><h4 style="color:#f59e0b;">{{ late_count }}</h4>
+    </div>
+    <div class="card" style="border-left:4px solid #ef4444;">
+        <span>Absent</span><h4 style="color:#ef4444;">{{ absent_count }}</h4>
+    </div>
+    <div class="card">
+        <span>Attendance Rate</span>
+        <h4>{{ ((present_count + late_count) / total * 100)|round(1) if total else 0 }}%</h4>
+    </div>
+</div>
+
+<!-- Report table -->
+<div class="table-card">
+    <h3><i class="fas fa-file-alt"></i> Report for {{ report_date }}</h3>
+
+    <div class="table-responsive">
     <table>
         <thead>
             <tr>
-                <th>Student</th>
-                <th>Date</th>
-                <th>Issue Type</th>
-                <th>Description</th>
+                <th>Student Name</th>
+                <th>Time</th>
                 <th>Status</th>
+                <th>Confidence</th>
+                <th>Override</th>
             </tr>
         </thead>
         <tbody>
-        {% if complaints %}
-            {% for issue in complaints %}
+        {% if attendance_logs %}
+            {% for row in attendance_logs %}
             <tr>
-                <td style="font-weight:600;">{{ issue.name }}</td>
-                <td>{{ issue.date }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.time }}</td>
                 <td>
-                    <span style="background: rgba(59,130,246,.2); color:#60a5fa; padding:4px 8px; border-radius:4px; font-size:12px;">
-                        {{ issue.type }}
-                    </span>
-                </td>
-                <td style="color:#cbd5e1;">{{ issue.description }}</td>
-                <td>
-                    {% if issue.status == 'Pending' %}
-                        <div style="display:flex; gap:6px;">
-                            <a href="/complaint/{{ issue.id }}/approve"
-                               class="btn"
-                               style="background:#10b981; color:white; padding:6px 10px; font-size:12px;">
-                                <i class="fas fa-check"></i> Accept
-                            </a>
-                            <a href="/complaint/{{ issue.id }}/reject"
-                               class="btn"
-                               style="background:#ef4444; color:white; padding:6px 10px; font-size:12px;">
-                                <i class="fas fa-times"></i> Deny
-                            </a>
-                        </div>
-                    {% elif issue.status == 'Resolved' %}
-                        <span style="color:#10b981; font-weight:600;">
-                            <i class="fas fa-check-circle"></i> Resolved
-                        </span>
+                    {% if row.status == "Present" %}
+                        <span class="badge badge-present">Present</span>
+                    {% elif row.status == "Late" %}
+                        <span class="badge badge-late">Late</span>
                     {% else %}
-                        <span style="color:#ef4444; font-weight:600;">
-                            <i class="fas fa-times-circle"></i> Rejected
+                        <span class="badge badge-absent">Absent</span>
+                    {% endif %}
+                    {% if row.override_reason %}
+                        <span class="override-tag" title="{{ row.override_reason }}">
+                            <i class="fas fa-pencil-alt"></i> edited
                         </span>
+                    {% endif %}
+                </td>
+                <td class="muted-text">
+                    {% if row.confidence > 0 %}{{ "%.1f"|format(row.confidence) }}%{% else %}–{% endif %}
+                </td>
+                <td>
+                    {% if row.record_id %}
+                    <!-- Override button (only for records that exist in DB) -->
+                    <button class="btn btn-primary"
+                            style="padding:5px 12px;font-size:12px;background:rgba(255,255,255,0.08);"
+                            onclick="openOverride(
+                                {{ row.record_id }},
+                                '{{ row.name }}',
+                                '{{ row.status }}',
+                                '{{ report_date }}'
+                            )">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    {% else %}
+                    <span class="muted-text" style="font-size:12px;">–</span>
                     {% endif %}
                 </td>
             </tr>
             {% endfor %}
         {% else %}
-            <tr>
-                <td colspan="5" style="text-align:center; color:#94a3b8;">
-                    No complaints submitted.
-                </td>
-            </tr>
+            <tr><td colspan="5">
+                <div class="empty-state">
+                    <i class="fas fa-calendar-times"></i>
+                    <span>No records for this date.</span>
+                </div>
+            </td></tr>
         {% endif %}
         </tbody>
     </table>
+    </div><!-- table-responsive -->
 </div>
 
-<div style="display:flex; justify-content:flex-end; margin-bottom:25px;">
-    <a href="/send_absentees" class="btn btn-primary">
-        <i class="fas fa-envelope"></i> Send Absentee Report
-    </a>
+<!-- ── OVERRIDE MODAL ────────────────────────────────────────────────────── -->
+<div id="overrideModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+        <h3 id="modalTitle"><i class="fas fa-edit"></i> Edit Attendance</h3>
+        <form method="POST" action="/override_attendance">
+            <input type="hidden" name="record_id"  id="modal_record_id">
+            <input type="hidden" name="date"        value="{{ report_date }}">
+
+            <label>Student</label>
+            <input type="text" id="modal_student_name" readonly
+                   style="width:100%;padding:8px 12px;border-radius:8px;
+                          background:rgba(255,255,255,0.04);
+                          border:1px solid var(--glass-border);
+                          color:var(--text-muted);">
+
+            <label>New Status</label>
+            <select name="new_status" id="modal_new_status">
+                <option value="Present">Present</option>
+                <option value="Late">Late</option>
+                <option value="Absent">Absent</option>
+            </select>
+
+            <label>Reason <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+            <textarea name="reason" rows="3"
+                      placeholder="e.g. Student was in medical appointment"></textarea>
+
+            <div style="display:flex;gap:12px;margin-top:20px;">
+                <button type="submit" class="btn btn-primary" style="flex:1;">
+                    <i class="fas fa-check"></i> Save
+                </button>
+                <button type="button" class="btn btn-primary"
+                        style="flex:1;background:rgba(255,255,255,0.06);"
+                        onclick="document.getElementById('overrideModal').style.display='none'">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
-<h3 style="margin-bottom: 15px;">
-    <i class="fas fa-calendar-day"></i> Daily Attendance Log
-</h3>
+{% endblock %}
 
-<div class="table-card">
-    <table>
-        <thead>
-            <tr>
-                <th>Student Name</th>
-                <th>Status</th>
-                <th>Time In</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for row in attendance_logs %}
-            <tr>
-                <td>{{ row.name }}</td>
-                <td style="color: {{ '#10b981' if row.status=='Present' else '#ef4444' }};">
-                    {{ row.status }}
-                </td>
-                <td>{{ row.time }}</td>
-                <td>{{ row.date }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
+{% block scripts %}
+<script>
+function openOverride(recordId, name, currentStatus, date) {
+    document.getElementById('modal_record_id').value    = recordId;
+    document.getElementById('modal_student_name').value = name;
+    document.getElementById('modal_new_status').value   = currentStatus;
+    document.getElementById('overrideModal').style.display = 'flex';
+}
 
+// Close modal on backdrop click
+document.getElementById('overrideModal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+</script>
 {% endblock %}

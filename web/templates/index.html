@@ -1,23 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}
-Teacher Dashboard
-{% endblock %}
-
-{% block header_title %}
-Teacher Dashboard
-{% endblock %}
+{% block title %}Teacher Dashboard{% endblock %}
+{% block header_title %}Teacher Dashboard{% endblock %}
 
 {% block content %}
 
 <!-- Welcome -->
 <div class="welcome-banner">
     <div class="user-avatar orange">
-        <i class="fas fa-user-graduate"></i>
+        <i class="fas fa-chalkboard-teacher"></i>
     </div>
     <div class="welcome-text">
-        <h3>Welcome Back, Teacher!</h3>
-        <p>System is monitoring <strong>{{ intruders|length }}</strong> security alerts.</p>
+        <h3>Welcome back, {{ session.user_name or "Teacher" }}!</h3>
+        <p>
+            {{ attendance|length }} student{{ attendance|length != 1 and "s" or "" }} present today
+            {% if intruders %} &nbsp;·&nbsp; <span style="color:#ef4444;">{{ intruders|length }} security alert{{ intruders|length != 1 and "s" or "" }}</span>{% endif %}
+        </p>
     </div>
     <a href="/start_camera" class="btn btn-primary">
         <i class="fas fa-camera"></i> Start Attendance
@@ -27,48 +25,106 @@ Teacher Dashboard
 <!-- Stats -->
 <div class="stats-grid">
     <div class="card">
-        <h4>120</h4><span>Total Students</span>
+        <span>Present Today</span>
+        <h4>{{ attendance|length }}</h4>
     </div>
-    <div class="card">
-        <h4>{{ attendance|length }}</h4><span>Present Today</span>
+    <div class="card" style="border-left:4px solid #f59e0b;">
+        <span>Late Today</span>
+        <h4>{{ attendance|selectattr("status","equalto","Late")|list|length }}</h4>
     </div>
     <div class="card danger">
-        <h4>{{ intruders|length }}</h4><span>Security Alerts</span>
+        <span>Security Alerts</span>
+        <h4>{{ intruders|length }}</h4>
     </div>
-    <div class="card">
-        <h4>95%</h4><span>Efficiency</span>
+    <div class="card" style="border-left:4px solid #ef4444;">
+        <span>At-Risk Students</span>
+        <h4>{{ at_risk|length }}</h4>
     </div>
 </div>
 
-<!-- Attendance Trend -->
+<!-- 7-day Attendance Trend -->
 <div class="table-card">
-    <h3><i class="fas fa-chart-line"></i> Attendance Trend (Last 7 Days)</h3>
-    <div id="attendanceChart" style="height:350px;"></div>
+    <h3><i class="fas fa-chart-line"></i> Attendance Trend – Last 7 Days</h3>
+    <div id="attendanceChart" style="height:320px;"></div>
 </div>
 
-<!-- Attendance Table -->
+<!-- At-Risk Students (below threshold) -->
+{% if at_risk %}
+<div class="table-card" style="border-left:4px solid #ef4444;">
+    <h3><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i>
+        Low-Attendance Alerts</h3>
+    <p class="muted-text">Students whose attendance has dropped below the configured threshold.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Student Name</th>
+                <th>Attendance</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in at_risk %}
+            <tr>
+                <td>{{ s.name }}</td>
+                <td style="color:#ef4444;font-weight:600;">{{ s.percentage }}%</td>
+                <td>
+                    <a href="/report" class="btn btn-primary"
+                       style="padding:6px 14px;font-size:13px;">View Report</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Today's Attendance Table -->
 <div class="table-card">
-    <h3>Today's Attendance</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;">Today's Attendance</h3>
+        <a href="/report" class="btn btn-primary" style="padding:8px 16px;font-size:13px;">
+            <i class="fas fa-file-alt"></i> Full Report
+        </a>
+    </div>
     <table>
         <thead>
             <tr>
                 <th>Student Name</th>
                 <th>Time In</th>
                 <th>Status</th>
+                <th>Confidence</th>
             </tr>
         </thead>
         <tbody>
         {% if attendance %}
             {% for row in attendance %}
             <tr>
-                <td>{{ row[0] }}</td>
-                <td>{{ row[2] }}</td>
-                <td class="green">Present</td>
+                <td>{{ row["name"] }}</td>
+                <td>{{ row["time"] }}</td>
+                <td>
+                    {% if row["status"] == "Present" %}
+                        <span class="badge badge-present">Present</span>
+                    {% elif row["status"] == "Late" %}
+                        <span class="badge badge-late">Late</span>
+                    {% else %}
+                        <span class="badge badge-absent">{{ row["status"] }}</span>
+                    {% endif %}
+                </td>
+                <td class="muted-text">{{ "%.1f"|format(row["confidence"]) }}%</td>
             </tr>
             {% endfor %}
         {% else %}
             <tr>
-                <td colspan="3" style="text-align:center;">No one present yet.</td>
+                <td colspan="4">
+                    <div class="empty-state">
+                        <i class="fas fa-camera-slash"></i>
+                        <span>No attendance recorded yet today.</span>
+                        <a href="/start_camera" class="btn btn-primary"
+                           style="margin-top:14px;">
+                            <i class="fas fa-camera"></i> Start Camera
+                        </a>
+                    </div>
+                </td>
             </tr>
         {% endif %}
         </tbody>
@@ -76,7 +132,7 @@ Teacher Dashboard
 </div>
 
 <!-- Security Alerts -->
-<div class="table-card alert">
+<div class="table-card">
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <h3><i class="fas fa-shield-alt"></i> Security Alerts</h3>
         {% if intruders %}
@@ -87,16 +143,20 @@ Teacher Dashboard
     </div>
 
     {% if intruders %}
-    <div class="security-grid">
+    <div class="security-grid" style="margin-top:16px;">
         {% for intruder in intruders %}
         <div class="intruder-card">
-            <img src="{{ url_for('serve_intruder', filename=intruder.filename) }}"alt="Intruder"style="width:100%; border-radius:10px;">
-            <p>UNKNOWN</p>
+            <img src="{{ url_for('serve_intruder', filename=intruder.filename) }}"
+                 alt="Unknown face" style="width:100%;border-radius:10px;">
+            <p style="text-align:center;font-size:12px;color:#ef4444;margin:6px 0;">UNKNOWN</p>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <p class="center green">No security threats detected.</p>
+    <div class="empty-state">
+        <i class="fas fa-shield-alt" style="color:#10b981;"></i>
+        <span style="color:#10b981;">No security threats detected.</span>
+    </div>
     {% endif %}
 </div>
 
@@ -106,25 +166,26 @@ Teacher Dashboard
 <script src="https://code.highcharts.com/highcharts.js"></script>
 <script>
 Highcharts.chart('attendanceChart', {
-    chart: {
-        type: 'spline',
-        backgroundColor: 'transparent'
+    chart:  { type: 'spline', backgroundColor: 'transparent' },
+    title:  { text: null },
+    xAxis:  {
+        categories: {{ chart_labels | tojson }},
+        labels: { style: { color: '#94a3b8', fontFamily: 'Plus Jakarta Sans' } }
     },
-    title: { text: null },
-    xAxis: {
-        categories: {{ chart_labels | safe }},
-        labels: { style: { color: '#94a3b8' } }
+    yAxis:  {
+        min: 0, max: 100,
+        title: { text: 'Attendance %', style: { color: '#94a3b8' } },
+        gridLineColor: 'rgba(255,255,255,0.06)'
     },
-    yAxis: {
-        title: { text: 'Attendance %' },
-        max: 100
-    },
-    tooltip: { valueSuffix: '%' },
+    tooltip: { valueSuffix: '%', backgroundColor: '#0f172a', style: { color: '#f8fafc' } },
     series: [{
-        name: 'Attendance',
-        data: {{ chart_data | safe }},
-        color: '#ff9b44'
+        name:  'Attendance',
+        data:  {{ chart_data | tojson }},
+        color: '#ff9b44',
+        lineWidth: 3,
+        marker: { radius: 5, fillColor: '#ff9b44' }
     }],
+    legend:  { enabled: false },
     credits: { enabled: false }
 });
 </script>

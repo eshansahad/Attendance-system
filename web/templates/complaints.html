@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Student Complaints{% endblock %}
+{% block header_title %}Student Complaints{% endblock %}
+
+{% block content %}
+
+<!-- Filter tabs + pending badge -->
+<div style="display:flex;align-items:center;justify-content:space-between;
+            flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for f in ["Pending","Accepted","Declined","All"] %}
+        <a href="/complaints?status={{ f }}"
+           class="filter-tab {% if status_filter == f %}filter-tab-active{% endif %}">
+            {{ f }}
+            {% if f == "Pending" and pending_count > 0 %}
+                <span class="pending-badge">{{ pending_count }}</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+{% if complaints %}
+{% for c in complaints %}
+<div class="complaint-card
+    {% if c.status == 'Accepted' %}complaint-accepted
+    {% elif c.status == 'Declined' %}complaint-declined
+    {% else %}complaint-pending{% endif %}">
+
+    <!-- Header -->
+    <div class="complaint-header">
+        <div>
+            <span class="complaint-date">
+                <i class="fas fa-calendar-day"></i> {{ c.date }}
+            </span>
+            <span class="complaint-reason">{{ c.reason }}</span>
+            <span style="font-size:13px;color:var(--text-muted);margin-left:6px;">
+                — {{ c.student_name }}
+            </span>
+        </div>
+        <div>
+            {% if c.status == 'Pending' %}
+                <span class="badge badge-late">
+                    <i class="fas fa-clock"></i> Pending
+                </span>
+            {% elif c.status == 'Accepted' %}
+                <span class="badge badge-present">
+                    <i class="fas fa-check-circle"></i> Accepted
+                </span>
+            {% else %}
+                <span class="badge badge-absent">
+                    <i class="fas fa-times-circle"></i> Declined
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Student's description -->
+    <p class="complaint-desc">{{ c.description }}</p>
+
+    <!-- Teacher reply if already resolved -->
+    {% if c.teacher_note %}
+    <div class="teacher-reply">
+        <i class="fas fa-chalkboard-teacher"></i>
+        <div>
+            <strong>Your Note:</strong>
+            <p>{{ c.teacher_note }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Footer timestamps -->
+    <div class="complaint-footer">
+        <span><i class="fas fa-paper-plane"></i> Submitted: {{ c.created_at[:16] }}</span>
+        {% if c.resolved_at %}
+        <span><i class="fas fa-check"></i> Resolved: {{ c.resolved_at[:16] }}</span>
+        {% endif %}
+    </div>
+
+    <!-- Action buttons — only show for Pending -->
+    {% if c.status == 'Pending' %}
+    <div class="complaint-actions">
+        <button class="btn btn-primary"
+                style="background:rgba(255,255,255,0.06);"
+                onclick="openResolve({{ c.id }}, 'accept', '{{ c.student_name }}', '{{ c.date }}')">
+            <i class="fas fa-check-circle" style="color:#10b981;"></i> Accept
+        </button>
+        <button class="btn btn-primary"
+                style="background:rgba(255,255,255,0.06);"
+                onclick="openResolve({{ c.id }}, 'decline', '{{ c.student_name }}', '{{ c.date }}')">
+            <i class="fas fa-times-circle" style="color:#ef4444;"></i> Decline
+        </button>
+    </div>
+    {% endif %}
+
+</div>
+{% endfor %}
+
+{% else %}
+<div class="table-card">
+    <div class="empty-state">
+        <i class="fas fa-flag"></i>
+        <span>No {{ status_filter.lower() }} complaints.</span>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ── RESOLVE MODAL ──────────────────────────────────────────────────────── -->
+<div id="resolveModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+        <h3 id="modalTitle"></h3>
+        <p id="modalSubtitle" class="muted-text" style="margin:-8px 0 20px;"></p>
+
+        <form method="POST" id="resolveForm">
+            <input type="hidden" name="action"      id="modal_action">
+            <input type="hidden" name="back_filter" value="{{ status_filter }}">
+
+            <label>Note to Student
+                <span style="color:var(--text-muted);font-weight:400;">
+                    (optional)
+                </span>
+            </label>
+            <textarea name="teacher_note" rows="4"
+                      placeholder="e.g. Approved — camera log confirmed the issue."></textarea>
+
+            <div style="display:flex;gap:12px;margin-top:20px;">
+                <button type="submit" id="modalSubmitBtn" class="btn btn-primary"
+                        style="flex:1;justify-content:center;">
+                    Confirm
+                </button>
+                <button type="button" class="btn btn-primary"
+                        style="flex:1;justify-content:center;
+                               background:rgba(255,255,255,0.06);"
+                        onclick="document.getElementById('resolveModal').style.display='none'">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openResolve(id, action, name, date) {
+    const isAccept = action === 'accept';
+
+    document.getElementById('modalTitle').innerHTML =
+        isAccept
+        ? '<i class="fas fa-check-circle" style="color:#10b981;"></i> Accept Complaint'
+        : '<i class="fas fa-times-circle" style="color:#ef4444;"></i> Decline Complaint';
+
+    document.getElementById('modalSubtitle').textContent =
+        name + ' — absent on ' + date;
+
+    document.getElementById('modal_action').value = action;
+    document.getElementById('resolveForm').action =
+        '/complaint/resolve/' + id;
+
+    const btn = document.getElementById('modalSubmitBtn');
+    btn.style.background = isAccept ? '#10b981' : '#ef4444';
+    btn.textContent = isAccept ? 'Accept & Mark Present' : 'Decline';
+
+    document.getElementById('resolveModal').style.display = 'flex';
+}
+
+document.getElementById('resolveModal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+</script>
+{% endblock %}
