@@ -81,7 +81,43 @@ def migrate():
     except sqlite3.OperationalError as e:
         print(f"  [WARN] Could not create unique index: {e}")
 
-    # ── 4. COMPLAINTS TABLE ─────────────────────────────────────────────────
+    # ── 4. is_active COLUMN ON students TABLE ───────────────────────────────
+    student_cols = {
+        row[1]
+        for row in cursor.execute("PRAGMA table_info(students)").fetchall()
+    }
+    if "is_active" not in student_cols:
+        cursor.execute(
+            "ALTER TABLE students ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"
+        )
+        print("  [ADD]  students.is_active")
+    else:
+        print("  [OK]   students.is_active already exists")
+
+    # ── 5. student_seen COLUMN ON complaints TABLE ──────────────────────────
+    # Added after complaints table exists, so check first
+    try:
+        complaint_cols = {
+            row[1]
+            for row in cursor.execute("PRAGMA table_info(complaints)").fetchall()
+        }
+        if "student_seen" not in complaint_cols:
+            cursor.execute(
+                "ALTER TABLE complaints"
+                " ADD COLUMN student_seen INTEGER NOT NULL DEFAULT 1"
+            )
+            # Existing resolved complaints default to seen=1 (no false alerts)
+            cursor.execute(
+                "UPDATE complaints SET student_seen=1"
+                " WHERE status IN ('Accepted','Declined')"
+            )
+            print("  [ADD]  complaints.student_seen")
+        else:
+            print("  [OK]   complaints.student_seen already exists")
+    except Exception:
+        pass   # complaints table may not exist yet — created below
+
+    # ── 6. COMPLAINTS TABLE ─────────────────────────────────────────────────
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS complaints (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,

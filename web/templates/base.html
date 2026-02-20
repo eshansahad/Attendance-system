@@ -55,8 +55,11 @@
         <li><a href="/complaint/new" class="{% if active_page=='complaints' %}active{% endif %}">
             <i class="fas fa-flag"></i> File Complaint</a></li>
 
-        <li><a href="/complaint/my" class="{% if active_page=='my_complaints' %}active{% endif %}">
-            <i class="fas fa-list"></i> My Complaints</a></li>
+        <li><a href="/complaint/my" class="{% if active_page=='my_complaints' %}active{% endif %}"
+               style="position:relative;">
+            <i class="fas fa-list"></i> My Complaints
+            <span class="notif-badge" id="complaint-badge" style="display:none;"></span>
+        </a></li>
     {% endif %}
 
     <li style="margin-top:auto;border-top:1px solid var(--glass-border);padding-top:8px;">
@@ -97,5 +100,58 @@
 </div>
 
 {% block scripts %}{% endblock %}
+
+<!-- ── COMPLAINT BADGE (student only) ──────────────────────────────── -->
+{% if session.role == 'student' %}
+<style>
+.notif-badge {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    min-width: 18px;
+    height: 18px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    box-shadow: 0 0 0 2px var(--bg-dark);
+    animation: badgePop 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes badgePop {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
+}
+</style>
+<script>
+(function() {
+    const badge = document.getElementById('complaint-badge');
+    if (!badge) return;
+
+    function pollBadge() {
+        fetch('/complaint/badge')
+            .then(r => r.json())
+            .then(data => {
+                if (data.count && data.count > 0) {
+                    badge.textContent = data.count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            })
+            .catch(() => {});
+    }
+
+    // Run immediately, then every 10 seconds
+    pollBadge();
+    setInterval(pollBadge, 10000);
+})();
+</script>
+{% endif %}
+
 </body>
 </html>

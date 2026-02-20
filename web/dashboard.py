@@ -99,12 +99,17 @@ def login():
                 (username, password)
             ).fetchone()
             if user:
-                session["user_id"]   = user["id"]
-                session["role"]      = "student"
-                session["user_name"] = user["name"]
-                conn.close()
-                return redirect(url_for("student_dashboard"))
-            error = "Invalid student credentials."
+                # Block archived students
+                if user["is_active"] == 0:
+                    error = "Your account has been deactivated. Please contact your teacher."
+                else:
+                    session["user_id"]   = user["id"]
+                    session["role"]      = "student"
+                    session["user_name"] = user["name"]
+                    conn.close()
+                    return redirect(url_for("student_dashboard"))
+            else:
+                error = "Invalid student credentials."
 
         else:
             error = "Please select a role."
@@ -254,14 +259,22 @@ def students_page():
     raw_students = conn.execute("SELECT * FROM students").fetchall()
     conn.close()
 
-    # Attach attendance stats to each student
-    students = []
+    # Attach attendance stats and split active / archived
+    active_students   = []
+    archived_students = []
     for s in raw_students:
         stats = get_attendance_percentage(s["id"])
-        students.append({**dict(s), **stats})
+        row   = {**dict(s), **stats}
+        if s["is_active"] == 1:
+            active_students.append(row)
+        else:
+            archived_students.append(row)
 
     return render_template(
-        "students.html", students=students, active_page="students"
+        "students.html",
+        students          = active_students,
+        archived_students = archived_students,
+        active_page       = "students",
     )
 
 
@@ -668,6 +681,29 @@ def student_dashboard():
     )
 
 
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  COMPLAINT NOTIFICATION BADGE                                           ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+@app.route("/complaint/badge")
+def complaint_badge():
+    """
+    Returns count of resolved complaints the student hasn't seen yet.
+    Called by AJAX every 10s from base.html sidebar (student only).
+    """
+    if session.get("role") != "student":
+        return {"count": 0}
+
+    conn = get_db_connection()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM complaints"
+        " WHERE student_id=? AND status != 'Pending' AND student_seen=0",
+        (session["user_id"],)
+    ).fetchone()[0]
+    conn.close()
+    return {"count": count}
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  INTRUDERS / SECURITY                                                   ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
@@ -702,6 +738,40 @@ def send_absentees():
     return redirect(url_for("report_page"))
 
 
+
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  STUDENT ARCHIVE / REACTIVATE                                           ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+@app.route("/archive_student/<int:student_id>")
+def archive_student(student_id):
+    """Soft-disable a student. Records kept, login blocked, camera ignored."""
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    conn = get_db_connection()
+    conn.execute(
+        "UPDATE students SET is_active=0 WHERE id=?", (student_id,)
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("students_page"))
+
+
+@app.route("/reactivate_student/<int:student_id>")
+def reactivate_student(student_id):
+    """Re-enable an archived student."""
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    conn = get_db_connection()
+    conn.execute(
+        "UPDATE students SET is_active=1 WHERE id=?", (student_id,)
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("students_page"))
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  COMPLAINTS                                                             ║
@@ -768,12 +838,20 @@ def my_complaints():
     conn = get_db_connection()
     complaints = conn.execute(
         """SELECT id, date, reason, description, status,
-                  teacher_note, created_at, resolved_at
+                  teacher_note, created_at, resolved_at, student_seen
            FROM   complaints
            WHERE  student_id = ?
            ORDER  BY created_at DESC""",
         (session["user_id"],)
     ).fetchall()
+
+    # Mark all resolved complaints as seen now that student has opened the page
+    conn.execute(
+        "UPDATE complaints SET student_seen=1"
+        " WHERE student_id=? AND status != 'Pending' AND student_seen=0",
+        (session["user_id"],)
+    )
+    conn.commit()
     conn.close()
 
     return render_template(
@@ -856,7 +934,7 @@ def resolve_complaint(complaint_id):
     if complaint:
         conn.execute(
             """UPDATE complaints
-               SET status=?, teacher_note=?, resolved_at=?
+               SET status=?, teacher_note=?, resolved_at=?, student_seen=0
                WHERE id=?""",
             (new_status, teacher_note, resolved_at, complaint_id)
         )
@@ -887,6 +965,105 @@ def resolve_complaint(complaint_id):
 
     conn.close()
     return redirect(url_for("complaints_page", status=back_filter))
+
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  REAL-TIME API                                                          ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+@app.route("/api/recent_checkins")
+def api_recent_checkins():
+    """
+    JSON endpoint polled by the camera page every 2 s.
+    Returns the last 15 attendance records from today,
+    plus a running present/late count for the session badge.
+    """
+    if session.get("role") != "teacher":
+        from flask import jsonify
+        return jsonify({"error": "unauthorized"}), 401
+
+    from flask import jsonify
+    conn = get_db_connection()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    rows = conn.execute("""
+        SELECT s.name, a.time, a.status, a.confidence, a.session
+        FROM   attendance a
+        JOIN   students   s ON a.student_id = s.id
+        WHERE  a.date = ?
+        ORDER  BY a.time DESC
+        LIMIT  15
+    """, (today,)).fetchall()
+
+    total_students = conn.execute(
+        "SELECT COUNT(*) FROM students"
+    ).fetchone()[0]
+
+    present_count = conn.execute(
+        "SELECT COUNT(DISTINCT student_id) FROM attendance WHERE date=?",
+        (today,)
+    ).fetchone()[0]
+
+    conn.close()
+
+    checkins = [{
+        "name":       r["name"],
+        "time":       r["time"][:5],          # HH:MM
+        "status":     r["status"],
+        "confidence": round(float(r["confidence"]), 1),
+        "session":    r["session"],
+    } for r in rows]
+
+    return jsonify({
+        "checkins":       checkins,
+        "present_count":  present_count,
+        "total_students": total_students,
+        "timestamp":      datetime.now().strftime("%H:%M:%S"),
+    })
+
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  REAL-TIME CHECK-INS  (AJAX endpoint)                                  ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+@app.route("/recent_checkins")
+def recent_checkins():
+    """
+    Returns the last 10 attendance records from today as JSON.
+    Polled every 2s by the camera page to update the live panel.
+    """
+    if session.get("role") != "teacher":
+        return {"error": "unauthorized"}, 401
+
+    conn = get_db_connection()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    rows = conn.execute("""
+        SELECT s.name, a.time, a.status, a.confidence, a.session
+        FROM   attendance a
+        JOIN   students   s ON a.student_id = s.id
+        WHERE  a.date = ?
+        ORDER  BY a.time DESC
+        LIMIT  10
+    """, (today,)).fetchall()
+    conn.close()
+
+    total_today = len(rows)
+
+    return {
+        "checkins": [
+            {
+                "name":       r["name"],
+                "time":       r["time"][:5],
+                "status":     r["status"],
+                "confidence": round(r["confidence"], 1),
+                "session":    r["session"],
+            }
+            for r in rows
+        ],
+        "total": total_today,
+        "date":  today,
+    }
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  RUN                                                                    ║

@@ -15,8 +15,17 @@
     </a>
 </div>
 
+<!-- ── ACTIVE STUDENTS ──────────────────────────────────────────────── -->
 <div class="table-card">
-    <h3><i class="fas fa-user-graduate"></i> All Students ({{ students|length }})</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h3 style="margin:0;">
+            <i class="fas fa-user-graduate"></i>
+            Active Students
+            <span style="font-size:13px;color:var(--text-muted);font-weight:400;margin-left:8px;">
+                ({{ students|length }})
+            </span>
+        </h3>
+    </div>
 
     {% if students %}
     <div class="table-responsive">
@@ -39,7 +48,8 @@
             <td>
                 {{ s.name }}
                 {% if s.below_threshold %}
-                    <span class="override-tag" style="background:rgba(239,68,68,0.15);color:#ef4444;">
+                    <span class="override-tag"
+                          style="background:rgba(239,68,68,0.15);color:#ef4444;">
                         <i class="fas fa-exclamation-triangle"></i> at risk
                     </span>
                 {% endif %}
@@ -66,12 +76,24 @@
             <td><span style="color:#f59e0b;">{{ s.late }}</span></td>
             <td><span style="color:#ef4444;">{{ s.absent }}</span></td>
             <td>
-                <a href="/delete_student/{{ s.id }}"
-                   onclick="return confirm('Delete {{ s.name }} and all their records?')"
-                   class="btn btn-primary"
-                   style="padding:6px 14px;font-size:12px;background:#ef4444;">
-                    <i class="fas fa-trash"></i> Delete
-                </a>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <!-- Archive button -->
+                    <a href="/archive_student/{{ s.id }}"
+                       onclick="return confirm('Archive {{ s.name }}? They won\'t be able to log in but their records will be kept.')"
+                       class="btn btn-primary"
+                       style="padding:6px 12px;font-size:12px;
+                              background:rgba(245,158,11,0.15);
+                              color:#f59e0b;border:1px solid rgba(245,158,11,0.3);">
+                        <i class="fas fa-archive"></i> Archive
+                    </a>
+                    <!-- Delete button -->
+                    <a href="/delete_student/{{ s.id }}"
+                       onclick="return confirm('Permanently delete {{ s.name }} and ALL their records? This cannot be undone.')"
+                       class="btn btn-primary"
+                       style="padding:6px 12px;font-size:12px;background:#ef4444;">
+                        <i class="fas fa-trash"></i> Delete
+                    </a>
+                </div>
             </td>
         </tr>
         {% endfor %}
@@ -81,12 +103,98 @@
     {% else %}
     <div class="empty-state">
         <i class="fas fa-user-graduate"></i>
-        <span>No students registered yet.</span>
+        <span>No active students registered yet.</span>
         <a href="/register" class="btn btn-primary" style="margin-top:14px;">
             <i class="fas fa-user-plus"></i> Register First Student
         </a>
     </div>
     {% endif %}
 </div>
+
+<!-- ── ARCHIVED STUDENTS ─────────────────────────────────────────────── -->
+{% if archived_students %}
+<div class="table-card" style="border-left:4px solid rgba(245,158,11,0.5);opacity:0.85;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h3 style="margin:0;color:var(--text-muted);">
+            <i class="fas fa-archive" style="color:#f59e0b;"></i>
+            Archived Students
+            <span style="font-size:13px;font-weight:400;margin-left:8px;">
+                ({{ archived_students|length }})
+            </span>
+        </h3>
+        <span style="font-size:12px;color:var(--text-muted);">
+            Records preserved · Login disabled · Camera ignored
+        </span>
+    </div>
+
+    <div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Attendance</th>
+                <th>Present</th>
+                <th>Late</th>
+                <th>Absent</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in archived_students %}
+        <tr style="opacity:0.6;">
+            <td class="muted-text">{{ loop.index }}</td>
+            <td>
+                <span style="text-decoration:line-through;color:var(--text-muted);">
+                    {{ s.name }}
+                </span>
+                <span class="override-tag"
+                      style="background:rgba(245,158,11,0.1);color:#f59e0b;">
+                    <i class="fas fa-archive"></i> archived
+                </span>
+            </td>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="progress-bar" style="width:90px;flex-shrink:0;">
+                        <div class="progress-fill"
+                             style="width:{{ s.percentage }}%;
+                                    background:rgba(255,255,255,0.15);">
+                        </div>
+                    </div>
+                    <span style="font-weight:600;color:var(--text-muted);">
+                        {{ s.percentage }}%
+                    </span>
+                </div>
+            </td>
+            <td><span style="color:var(--text-muted);">{{ s.present }}</span></td>
+            <td><span style="color:var(--text-muted);">{{ s.late }}</span></td>
+            <td><span style="color:var(--text-muted);">{{ s.absent }}</span></td>
+            <td>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <!-- Reactivate -->
+                    <a href="/reactivate_student/{{ s.id }}"
+                       onclick="return confirm('Reactivate {{ s.name }}? They will be able to log in and attend again.')"
+                       class="btn btn-primary"
+                       style="padding:6px 12px;font-size:12px;
+                              background:rgba(16,185,129,0.15);
+                              color:#10b981;border:1px solid rgba(16,185,129,0.3);">
+                        <i class="fas fa-undo"></i> Reactivate
+                    </a>
+                    <!-- Permanent delete -->
+                    <a href="/delete_student/{{ s.id }}"
+                       onclick="return confirm('Permanently delete {{ s.name }} and ALL their records? This cannot be undone.')"
+                       class="btn btn-primary"
+                       style="padding:6px 12px;font-size:12px;background:#ef4444;">
+                        <i class="fas fa-trash"></i> Delete
+                    </a>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
 
 {% endblock %}
