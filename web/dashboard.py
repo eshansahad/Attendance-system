@@ -1,16 +1,9 @@
 """
-web/dashboard.py
-Flask application for Smart Attend.
-
-Changes from original:
-  - Fixed: row[2] bug in teacher dashboard attendance query (now uses named cols)
-  - Fixed: /clear_intruders route was missing despite being linked in template
-  - Added: /override_attendance  – teacher can correct a status + log reason
-  - Added: /export_report        – download filtered attendance as CSV
-  - Added: /bulk_import          – import students from a CSV file
-  - Added: /settings             – view/update late_cutoff & absence threshold
-  - Updated: /student_dashboard  – now passes %, calendar, stats, threshold
-  - Updated: /report             – now shows status column
+web/dashboard.py  — Smart Attend
+Includes all Priority 3 timetable fixes:
+  - get_timetable / get_today_schedule passed to both dashboard routes
+  - today_dow and active_session_now passed to templates
+  - subject_stats passed to student dashboard
 """
 
 # ── PATH SETUP (must be first) ───────────────────────────────────────────────
@@ -45,8 +38,12 @@ from database.db_utils import (
     set_setting,
     get_attendance_percentage,
     override_attendance,
+    get_timetable,
+    get_today_schedule,
+    get_attendance_by_subject,
 )
 from core.recognize import process_frame_for_flask
+from core.smart_register import SmartRegistrar
 
 # ── FLASK APP ────────────────────────────────────────────────────────────────
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -64,6 +61,37 @@ def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# ── SHARED: active session helper (used by index + timetable routes) ─────────
+def _get_active_session(conn):
+    """
+    Returns the subject name that is currently scheduled right now,
+    or falls back to the Settings session_name.
+    """
+    now  = datetime.now()
+    dow  = now.weekday()
+    hhmm = now.strftime("%H:%M")
+
+    row = conn.execute("""
+        SELECT s.name
+        FROM   timetable t
+        JOIN   subjects  s ON t.subject_id = s.id
+        WHERE  t.day_of_week = ?
+          AND  t.start_time  <= ?
+          AND  t.end_time    >  ?
+          AND  t.is_active   = 1
+          AND  s.is_active   = 1
+        LIMIT 1
+    """, (dow, hhmm, hhmm)).fetchone()
+
+    if row:
+        return row["name"]
+
+    setting = conn.execute(
+        "SELECT value FROM settings WHERE key='session_name'"
+    ).fetchone()
+    return setting["value"] if setting else "General"
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -99,7 +127,6 @@ def login():
                 (username, password)
             ).fetchone()
             if user:
-                # Block archived students
                 if user["is_active"] == 0:
                     error = "Your account has been deactivated. Please contact your teacher."
                 else:
@@ -137,8 +164,6 @@ def index():
     conn  = get_db_connection()
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # ── Today's attendance (fixed: was row[2] bug) ──────────────────────────
-    #    Now returns name, time, status so template can use row["name"] etc.
     attendance = conn.execute("""
         SELECT s.name, a.time, a.status, a.confidence, a.id AS record_id
         FROM   attendance a
@@ -147,32 +172,29 @@ def index():
         ORDER  BY a.time
     """, (today,)).fetchall()
 
-    # ── Security alerts ──────────────────────────────────────────────────────
     intruders = [
         {"filename": f}
         for f in sorted(os.listdir(INTRUDERS_DIR), reverse=True)
         if f.lower().endswith((".jpg", ".png"))
     ]
 
-    # ── 7-day trend data for Highcharts ─────────────────────────────────────
     chart_labels, chart_data = [], []
     total_students = conn.execute(
         "SELECT COUNT(*) FROM students"
-    ).fetchone()[0] or 1   # avoid division-by-zero
+    ).fetchone()[0] or 1
 
     for i in range(6, -1, -1):
-        day      = datetime.now() - timedelta(days=i)
-        d_str    = day.strftime("%Y-%m-%d")
-        label    = day.strftime("%d %b")
-        present  = conn.execute(
+        day     = datetime.now() - timedelta(days=i)
+        d_str   = day.strftime("%Y-%m-%d")
+        label   = day.strftime("%d %b")
+        present = conn.execute(
             "SELECT COUNT(DISTINCT student_id) FROM attendance WHERE date=?",
             (d_str,)
         ).fetchone()[0]
         chart_labels.append(label)
         chart_data.append(round(present / total_students * 100, 2))
 
-    # ── Low-attendance warnings for teacher ─────────────────────────────────
-    threshold  = float(get_setting("absent_threshold", "75"))
+    threshold    = float(get_setting("absent_threshold", "75"))
     all_students = conn.execute("SELECT id, name FROM students").fetchall()
     at_risk = []
     for s in all_students:
@@ -180,16 +202,23 @@ def index():
         if stats["below_threshold"]:
             at_risk.append({"name": s["name"], "percentage": stats["percentage"]})
 
+    # ── Timetable data for weekly grid ────────────────────────────────────
+    _now            = datetime.now()
+    active_session  = _get_active_session(conn)
     conn.close()
 
     return render_template(
         "index.html",
-        attendance=attendance,
-        intruders=intruders,
-        chart_labels=chart_labels,
-        chart_data=chart_data,
-        at_risk=at_risk,
-        active_page="dashboard",
+        attendance        = attendance,
+        intruders         = intruders,
+        chart_labels      = chart_labels,
+        chart_data        = chart_data,
+        at_risk           = at_risk,
+        timetable         = get_timetable(),
+        today_schedule    = get_today_schedule(),
+        active_session_now= active_session,
+        today_dow         = _now.weekday(),
+        active_page       = "dashboard",
     )
 
 
@@ -207,7 +236,6 @@ def start_camera():
 def gen_frames():
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
-        # Yield a simple error frame instead of crashing
         error_frame = 255 * __import__("numpy").ones((240, 640, 3), dtype="uint8")
         cv2.putText(
             error_frame, "Camera not found. Check connection.",
@@ -259,7 +287,6 @@ def students_page():
     raw_students = conn.execute("SELECT * FROM students").fetchall()
     conn.close()
 
-    # Attach attendance stats and split active / archived
     active_students   = []
     archived_students = []
     for s in raw_students:
@@ -300,17 +327,8 @@ def delete_student(student_id):
     return redirect(url_for("students_page"))
 
 
-# ── Bulk CSV import ──────────────────────────────────────────────────────────
 @app.route("/bulk_import", methods=["GET", "POST"])
 def bulk_import():
-    """
-    Import students from a CSV file.
-    Expected CSV format (header row required):
-        name,password
-        Alice,1234
-        Bob,5678
-    Students that already exist (by name) are skipped.
-    """
     if session.get("role") != "teacher":
         return redirect(url_for("login"))
 
@@ -354,7 +372,7 @@ def bulk_import():
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  REGISTER (single student + webcam capture)                             ║
+# ║  REGISTER                                                               ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 @app.route("/register", methods=["GET", "POST"])
@@ -383,37 +401,74 @@ def register_page():
     return render_template("register_form.html", active_page="register")
 
 
+_reg_sessions: dict = {}
+
 @app.route("/capture_images/<student_name>")
 def capture_images(student_name):
     if session.get("role") != "teacher":
         return redirect(url_for("login"))
+    _reg_sessions[student_name] = SmartRegistrar(student_name, DATASET_PATH)
+    return render_template(
+        "video_register.html",
+        student_name=student_name,
+        active_page="register",
+    )
 
-    folder = os.path.join(DATASET_PATH, student_name)
-    cap    = cv2.VideoCapture(0)
-    count  = 0
 
-    while count < 15:
-        ret, frame = cap.read()
+def _gen_register_frames(student_name: str):
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        return
+    reg = _reg_sessions.get(student_name)
+    if reg is None:
+        cap.release()
+        return
+    while not reg.done:
+        success, frame = cap.read()
+        if not success:
+            break
+        frame = cv2.flip(frame, 1)
+        frame = reg.process_frame(frame)
+        ret, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if not ret:
             continue
-        frame = cv2.flip(frame, 1)
-        cv2.putText(
-            frame, f"Capturing {count+1}/15",
-            (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2
+        yield (
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n" +
+            buf.tobytes() +
+            b"\r\n"
         )
-        cv2.imwrite(os.path.join(folder, f"{student_name}_{count}.jpg"), frame)
-        count += 1
-        time.sleep(0.2)
-
     cap.release()
-    os.system(
-        f'"{sys.executable}" "{os.path.join(PROJECT_ROOT, "core", "extract_embeddings.py")}"'
+    if reg and reg.done:
+        import subprocess
+        subprocess.Popen(
+            [sys.executable,
+             os.path.join(PROJECT_ROOT, "core", "extract_embeddings.py")]
+        )
+
+
+@app.route("/register_feed/<student_name>")
+def register_feed(student_name):
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return Response(
+        _gen_register_frames(student_name),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
     )
-    return redirect(url_for("students_page"))
+
+
+@app.route("/register_status/<student_name>")
+def register_status(student_name):
+    if session.get("role") != "teacher":
+        return {"error": "unauthorized"}, 401
+    reg = _reg_sessions.get(student_name)
+    if reg is None:
+        return {"error": "session not found"}, 404
+    return reg.status()
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  REPORT  (teacher view of today's full class)                           ║
+# ║  REPORT                                                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 @app.route("/report")
@@ -421,17 +476,32 @@ def report_page():
     if session.get("role") != "teacher":
         return redirect(url_for("login"))
 
-    conn      = get_db_connection()
-    # Allow filtering by date via ?date=YYYY-MM-DD
-    report_date = request.args.get("date", datetime.now().strftime("%Y-%m-%d"))
+    conn           = get_db_connection()
+    today          = datetime.now().strftime("%Y-%m-%d")
+    report_date    = request.args.get("date",           today)
+    session_filter = request.args.get("session_filter", "").strip()
+    status_filter  = request.args.get("status_filter",  "").strip()
 
-    students = conn.execute("SELECT id, name FROM students").fetchall()
-    present_rows = conn.execute(
-        "SELECT student_id, time, status, confidence, id AS record_id,"
-        "       override_reason"
-        " FROM attendance WHERE date=?",
-        (report_date,)
+    # ── All sessions ever recorded (for the filter dropdown) ──────────────
+    all_sessions_rows = conn.execute(
+        "SELECT DISTINCT session FROM attendance WHERE session IS NOT NULL"
+        " ORDER BY session"
     ).fetchall()
+    all_sessions = [r["session"] for r in all_sessions_rows if r["session"]]
+
+    # ── Students + attendance for the chosen date ─────────────────────────
+    students = conn.execute("SELECT id, name FROM students").fetchall()
+
+    query  = ("SELECT student_id, time, status, confidence, session,"
+              " id AS record_id, override_reason"
+              " FROM attendance WHERE date=?")
+    params = [report_date]
+
+    if session_filter:
+        query  += " AND session=?"
+        params.append(session_filter)
+
+    present_rows = conn.execute(query, params).fetchall()
     conn.close()
 
     present_map = {p["student_id"]: dict(p) for p in present_rows}
@@ -440,37 +510,46 @@ def report_page():
     for s in students:
         if s["id"] in present_map:
             r = present_map[s["id"]]
-            report.append({
+            row = {
                 "name":            s["name"],
                 "student_id":      s["id"],
                 "record_id":       r["record_id"],
                 "status":          r["status"],
                 "time":            r["time"],
                 "confidence":      r["confidence"],
+                "session":         r["session"],
                 "override_reason": r["override_reason"] or "",
                 "date":            report_date,
-            })
+            }
         else:
-            report.append({
+            row = {
                 "name":            s["name"],
                 "student_id":      s["id"],
                 "record_id":       None,
                 "status":          "Absent",
                 "time":            "--:--",
                 "confidence":      0.0,
+                "session":         session_filter or "—",
                 "override_reason": "",
                 "date":            report_date,
-            })
+            }
+
+        # Client-side status filter (still include all so JS can filter too)
+        if not status_filter or row["status"] == status_filter:
+            report.append(row)
 
     return render_template(
         "report.html",
-        attendance_logs=report,
-        report_date=report_date,
-        active_page="reports",
+        attendance_logs = report,
+        report_date     = report_date,
+        today           = today,
+        all_sessions    = all_sessions,
+        session_filter  = session_filter,
+        status_filter   = status_filter,
+        active_page     = "reports",
     )
 
 
-# ── Override attendance ──────────────────────────────────────────────────────
 @app.route("/override_attendance", methods=["POST"])
 def override_attendance_route():
     if session.get("role") != "teacher":
@@ -487,7 +566,6 @@ def override_attendance_route():
     return redirect(url_for("report_page", date=back_date))
 
 
-# ── Export CSV ───────────────────────────────────────────────────────────────
 @app.route("/export_report")
 def export_report():
     if session.get("role") != "teacher":
@@ -534,11 +612,10 @@ def settings_page():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        late_cutoff = request.form.get("late_cutoff", "09:00").strip()
-        threshold   = request.form.get("absent_threshold", "75").strip()
-        session_name = request.form.get("session_name", "General").strip()
+        late_cutoff  = request.form.get("late_cutoff",      "09:00").strip()
+        threshold    = request.form.get("absent_threshold",  "75").strip()
+        session_name = request.form.get("session_name",      "General").strip()
 
-        # Basic validation
         try:
             datetime.strptime(late_cutoff, "%H:%M")
         except ValueError:
@@ -571,25 +648,14 @@ def settings_page():
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 def _build_calendar(student_id: int, year: int, month: int) -> list:
-    """
-    Build a week-by-week calendar for one student for the given month.
-    Each day cell:
-      None              → padding day (before month starts)
-      dict with keys:
-        day    (int)    → day number
-        status (str)    → 'present' | 'late' | 'absent' | 'no-class' | 'future'
-        date   (str)    → YYYY-MM-DD
-    """
     conn = get_db_connection()
 
-    # School days this month = any day with attendance recorded for anyone
     school_days_rows = conn.execute(
         "SELECT DISTINCT date FROM attendance WHERE date LIKE ?",
         (f"{year}-{month:02d}-%",)
     ).fetchall()
     school_days = {r["date"] for r in school_days_rows}
 
-    # This student's own records
     my_rows = conn.execute(
         "SELECT date, status FROM attendance WHERE student_id=? AND date LIKE ?",
         (student_id, f"{year}-{month:02d}-%")
@@ -606,13 +672,13 @@ def _build_calendar(student_id: int, year: int, month: int) -> list:
             if day == 0:
                 row.append(None)
                 continue
-            d      = date(year, month, day)
-            d_str  = d.strftime("%Y-%m-%d")
+            d     = date(year, month, day)
+            d_str = d.strftime("%Y-%m-%d")
 
             if d > today:
                 status = "future"
             elif d_str in my_map:
-                status = my_map[d_str]       # 'present' or 'late'
+                status = my_map[d_str]
             elif d_str in school_days:
                 status = "absent"
             else:
@@ -632,7 +698,6 @@ def student_dashboard():
     student_id = session["user_id"]
     now        = datetime.now()
 
-    # ── Month/year from query string (defaults to current month) ─────────────
     try:
         req_year  = int(request.args.get("year",  now.year))
         req_month = int(request.args.get("month", now.month))
@@ -641,19 +706,14 @@ def student_dashboard():
     except (ValueError, TypeError):
         req_year, req_month = now.year, now.month
 
-    # ── Prev / next month for nav arrows ─────────────────────────────────────
     prev_dt    = date(req_year, req_month, 1) - timedelta(days=1)
     next_month = req_month % 12 + 1
     next_year  = req_year + (1 if req_month == 12 else 0)
 
-    # ── Stats (always all-time) ───────────────────────────────────────────────
-    stats = get_attendance_percentage(student_id)
-
-    # ── Calendar for selected month ───────────────────────────────────────────
-    cal_weeks  = _build_calendar(student_id, req_year, req_month)
+    stats     = get_attendance_percentage(student_id)
+    cal_weeks = _build_calendar(student_id, req_year, req_month)
     month_year = f"{calendar.month_name[req_month]} {req_year}"
 
-    # ── Recent records (last 10) ──────────────────────────────────────────────
     conn = get_db_connection()
     recent = conn.execute(
         "SELECT date, time, status, confidence, session"
@@ -665,21 +725,157 @@ def student_dashboard():
 
     return render_template(
         "student_dashboard.html",
-        student_name  = session["user_name"],
-        stats         = stats,
-        cal_weeks     = cal_weeks,
-        month_year    = month_year,
-        current_month = req_month,
-        current_year  = req_year,
-        prev_month    = prev_dt.month,
-        prev_year     = prev_dt.year,
-        next_month    = next_month,
-        next_year     = next_year,
-        month_names   = list(calendar.month_name)[1:],
-        year_range    = list(range(2020, now.year + 2)),
-        recent        = recent,
+        student_name   = session["user_name"],
+        stats          = stats,
+        cal_weeks      = cal_weeks,
+        month_year     = month_year,
+        current_month  = req_month,
+        current_year   = req_year,
+        prev_month     = prev_dt.month,
+        prev_year      = prev_dt.year,
+        next_month     = next_month,
+        next_year      = next_year,
+        month_names    = list(calendar.month_name)[1:],
+        year_range     = list(range(2020, now.year + 2)),
+        recent         = recent,
+        timetable      = get_timetable(),
+        today_schedule = get_today_schedule(),
+        today_dow      = now.weekday(),
+        subject_stats  = get_attendance_by_subject(student_id),
     )
 
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  TIMETABLE & SUBJECTS                                                   ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+@app.route("/timetable", methods=["GET"])
+def timetable_page():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    conn = get_db_connection()
+    now  = datetime.now()
+    dow  = now.weekday()
+    hhmm = now.strftime("%H:%M")
+
+    subjects_raw = conn.execute(
+        "SELECT * FROM subjects ORDER BY name"
+    ).fetchall()
+
+    timetable_raw = conn.execute("""
+        SELECT t.*, s.name AS subject_name, s.code AS subject_code
+        FROM   timetable t
+        JOIN   subjects  s ON t.subject_id = s.id
+        WHERE  t.is_active = 1
+        ORDER  BY t.day_of_week, t.start_time
+    """).fetchall()
+
+    today_schedule = []
+    active_period_ids = set()
+    for p in timetable_raw:
+        if p["day_of_week"] != dow:
+            continue
+        if hhmm >= p["start_time"] and hhmm < p["end_time"]:
+            status = "active"
+            active_period_ids.add(p["id"])
+        elif hhmm < p["start_time"]:
+            status = "upcoming"
+        else:
+            status = "ended"
+        today_schedule.append({**dict(p), "status": status})
+
+    active_session = _get_active_session(conn)
+    conn.close()
+
+    day_names = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+
+    return render_template(
+        "timetable.html",
+        subjects          = [dict(s) for s in subjects_raw],
+        timetable         = [dict(t) for t in timetable_raw],
+        today_schedule    = today_schedule,
+        active_period_ids = active_period_ids,
+        active_session    = active_session,
+        today_name        = day_names[dow],
+        today_dow         = dow,
+        active_page       = "timetable",
+    )
+
+
+@app.route("/timetable/add_subject", methods=["POST"])
+def timetable_add_subject():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    name    = request.form.get("name",    "").strip()
+    code    = request.form.get("code",    "").strip()
+    teacher = request.form.get("teacher", "").strip()
+
+    if not name:
+        return redirect(url_for("timetable_page"))
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            "INSERT INTO subjects (name, code, teacher) VALUES (?, ?, ?)",
+            (name, code, teacher)
+        )
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+    return redirect(url_for("timetable_page"))
+
+
+@app.route("/timetable/delete_subject/<int:subject_id>")
+def timetable_delete_subject(subject_id):
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    conn = get_db_connection()
+    conn.execute("UPDATE subjects  SET is_active=0 WHERE id=?", (subject_id,))
+    conn.execute("UPDATE timetable SET is_active=0 WHERE subject_id=?", (subject_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("timetable_page"))
+
+
+@app.route("/timetable/add_period", methods=["POST"])
+def timetable_add_period():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    subject_id  = request.form.get("subject_id",  type=int)
+    day_of_week = request.form.get("day_of_week", type=int)
+    start_time  = request.form.get("start_time",  "").strip()
+    end_time    = request.form.get("end_time",    "").strip()
+
+    if not all([subject_id, day_of_week is not None, start_time, end_time]):
+        return redirect(url_for("timetable_page"))
+    if start_time >= end_time:
+        return redirect(url_for("timetable_page"))
+
+    conn = get_db_connection()
+    conn.execute("""
+        INSERT INTO timetable (subject_id, day_of_week, start_time, end_time)
+        VALUES (?, ?, ?, ?)
+    """, (subject_id, day_of_week, start_time, end_time))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("timetable_page"))
+
+
+@app.route("/timetable/delete/<int:period_id>", methods=["POST"])
+def timetable_delete_period(period_id):
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    conn = get_db_connection()
+    conn.execute("UPDATE timetable SET is_active=0 WHERE id=?", (period_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("timetable_page"))
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -688,10 +884,6 @@ def student_dashboard():
 
 @app.route("/complaint/badge")
 def complaint_badge():
-    """
-    Returns count of resolved complaints the student hasn't seen yet.
-    Called by AJAX every 10s from base.html sidebar (student only).
-    """
     if session.get("role") != "student":
         return {"count": 0}
 
@@ -704,6 +896,7 @@ def complaint_badge():
     conn.close()
     return {"count": count}
 
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  INTRUDERS / SECURITY                                                   ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
@@ -715,7 +908,6 @@ def serve_intruder(filename):
 
 @app.route("/clear_intruders")
 def clear_intruders():
-    """Delete all saved intruder images (was missing from original codebase)."""
     if session.get("role") != "teacher":
         return redirect(url_for("login"))
 
@@ -738,22 +930,17 @@ def send_absentees():
     return redirect(url_for("report_page"))
 
 
-
-
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  STUDENT ARCHIVE / REACTIVATE                                           ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 @app.route("/archive_student/<int:student_id>")
 def archive_student(student_id):
-    """Soft-disable a student. Records kept, login blocked, camera ignored."""
     if session.get("role") != "teacher":
         return redirect(url_for("login"))
 
     conn = get_db_connection()
-    conn.execute(
-        "UPDATE students SET is_active=0 WHERE id=?", (student_id,)
-    )
+    conn.execute("UPDATE students SET is_active=0 WHERE id=?", (student_id,))
     conn.commit()
     conn.close()
     return redirect(url_for("students_page"))
@@ -761,23 +948,20 @@ def archive_student(student_id):
 
 @app.route("/reactivate_student/<int:student_id>")
 def reactivate_student(student_id):
-    """Re-enable an archived student."""
     if session.get("role") != "teacher":
         return redirect(url_for("login"))
 
     conn = get_db_connection()
-    conn.execute(
-        "UPDATE students SET is_active=1 WHERE id=?", (student_id,)
-    )
+    conn.execute("UPDATE students SET is_active=1 WHERE id=?", (student_id,))
     conn.commit()
     conn.close()
     return redirect(url_for("students_page"))
+
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  COMPLAINTS                                                             ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-# ── Student: submit a new complaint ─────────────────────────────────────────
 @app.route("/complaint/new", methods=["GET", "POST"])
 def new_complaint():
     if session.get("role") != "student":
@@ -794,7 +978,6 @@ def new_complaint():
             flash("All fields are required.", "error")
             return redirect(url_for("new_complaint"))
 
-        # Check there isn't already a pending complaint for this date
         conn = get_db_connection()
         existing = conn.execute(
             "SELECT id FROM complaints"
@@ -820,7 +1003,6 @@ def new_complaint():
         flash("Complaint submitted successfully. Waiting for teacher review.", "success")
         return redirect(url_for("my_complaints"))
 
-    # GET — pre-fill date from query string if coming from calendar
     prefill_date = request.args.get("date", "")
     return render_template(
         "complaint_form.html",
@@ -829,7 +1011,6 @@ def new_complaint():
     )
 
 
-# ── Student: view their own complaints ───────────────────────────────────────
 @app.route("/complaint/my")
 def my_complaints():
     if session.get("role") != "student":
@@ -845,7 +1026,6 @@ def my_complaints():
         (session["user_id"],)
     ).fetchall()
 
-    # Mark all resolved complaints as seen now that student has opened the page
     conn.execute(
         "UPDATE complaints SET student_seen=1"
         " WHERE student_id=? AND status != 'Pending' AND student_seen=0",
@@ -861,7 +1041,6 @@ def my_complaints():
     )
 
 
-# ── Teacher: view all complaints ─────────────────────────────────────────────
 @app.route("/complaints")
 def complaints_page():
     if session.get("role") != "teacher":
@@ -900,20 +1079,19 @@ def complaints_page():
 
     return render_template(
         "complaints.html",
-        complaints     = rows,
-        status_filter  = status_filter,
-        pending_count  = pending_count,
-        active_page    = "complaints",
+        complaints    = rows,
+        status_filter = status_filter,
+        pending_count = pending_count,
+        active_page   = "complaints",
     )
 
 
-# ── Teacher: accept or decline a complaint ───────────────────────────────────
 @app.route("/complaint/resolve/<int:complaint_id>", methods=["POST"])
 def resolve_complaint(complaint_id):
     if session.get("role") != "teacher":
         return redirect(url_for("login"))
 
-    action       = request.form.get("action", "")       # "accept" or "decline"
+    action       = request.form.get("action", "")
     teacher_note = request.form.get("teacher_note", "").strip()
     back_filter  = request.form.get("back_filter", "Pending")
 
@@ -925,7 +1103,6 @@ def resolve_complaint(complaint_id):
 
     conn = get_db_connection()
 
-    # Fetch complaint so we can update attendance if accepted
     complaint = conn.execute(
         "SELECT student_id, date FROM complaints WHERE id=?",
         (complaint_id,)
@@ -939,11 +1116,9 @@ def resolve_complaint(complaint_id):
             (new_status, teacher_note, resolved_at, complaint_id)
         )
 
-        # If accepted → mark the student present for that date
-        # (only insert if not already present)
         if action == "accept":
-            student_id = complaint["student_id"]
-            abs_date   = complaint["date"]
+            student_id   = complaint["student_id"]
+            abs_date     = complaint["date"]
             session_name = get_setting("session_name", "General")
 
             already = conn.execute(
@@ -973,17 +1148,12 @@ def resolve_complaint(complaint_id):
 
 @app.route("/api/recent_checkins")
 def api_recent_checkins():
-    """
-    JSON endpoint polled by the camera page every 2 s.
-    Returns the last 15 attendance records from today,
-    plus a running present/late count for the session badge.
-    """
     if session.get("role") != "teacher":
         from flask import jsonify
         return jsonify({"error": "unauthorized"}), 401
 
     from flask import jsonify
-    conn = get_db_connection()
+    conn  = get_db_connection()
     today = datetime.now().strftime("%Y-%m-%d")
 
     rows = conn.execute("""
@@ -1008,7 +1178,7 @@ def api_recent_checkins():
 
     checkins = [{
         "name":       r["name"],
-        "time":       r["time"][:5],          # HH:MM
+        "time":       r["time"][:5],
         "status":     r["status"],
         "confidence": round(float(r["confidence"]), 1),
         "session":    r["session"],
@@ -1022,20 +1192,12 @@ def api_recent_checkins():
     })
 
 
-# ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  REAL-TIME CHECK-INS  (AJAX endpoint)                                  ║
-# ╚══════════════════════════════════════════════════════════════════════════╝
-
 @app.route("/recent_checkins")
 def recent_checkins():
-    """
-    Returns the last 10 attendance records from today as JSON.
-    Polled every 2s by the camera page to update the live panel.
-    """
     if session.get("role") != "teacher":
         return {"error": "unauthorized"}, 401
 
-    conn = get_db_connection()
+    conn  = get_db_connection()
     today = datetime.now().strftime("%Y-%m-%d")
 
     rows = conn.execute("""
@@ -1048,8 +1210,6 @@ def recent_checkins():
     """, (today,)).fetchall()
     conn.close()
 
-    total_today = len(rows)
-
     return {
         "checkins": [
             {
@@ -1061,13 +1221,185 @@ def recent_checkins():
             }
             for r in rows
         ],
-        "total": total_today,
+        "total": len(rows),
         "date":  today,
     }
 
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  RUN                                                                    ║
+# ║  PRIORITY 4 — ADVANCED ANALYTICS                                        ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
+
+@app.route("/analytics")
+def analytics_page():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+
+    days = request.args.get("days", 30, type=int)
+    if days not in (30, 60, 90, 180, 365):
+        days = 30
+
+    conn      = get_db_connection()
+    today     = datetime.now()
+    today_str = today.strftime("%Y-%m-%d")
+    start_str = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    total_students_n = conn.execute(
+        "SELECT COUNT(*) FROM students WHERE is_active=1"
+    ).fetchone()[0] or 1
+
+    # ── 1. Class-wide daily trend ──────────────────────────────────────────
+    class_rows = conn.execute("""
+        SELECT date, COUNT(DISTINCT student_id) AS present
+        FROM   attendance
+        WHERE  date BETWEEN ? AND ?
+        GROUP  BY date
+        ORDER  BY date
+    """, (start_str, today_str)).fetchall()
+
+    class_trend_labels = [r["date"][5:] for r in class_rows]   # MM-DD
+    class_trend_data   = [
+        round(r["present"] / total_students_n * 100, 1)
+        for r in class_rows
+    ]
+
+    # ── 2. Weekday heatmap ─────────────────────────────────────────────────
+    DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    weekday_totals  = {i: 0   for i in range(7)}
+    weekday_present = {i: 0.0 for i in range(7)}
+    weekday_counts  = {i: 0   for i in range(7)}
+
+    for r in class_rows:
+        d   = datetime.strptime(r["date"], "%Y-%m-%d")
+        dow = d.weekday()
+        weekday_totals[dow]  += r["present"]
+        weekday_counts[dow]  += 1
+
+    weekday_data = []
+    for i in range(7):
+        c = weekday_counts[i]
+        avg = round(weekday_totals[i] / c / total_students_n * 100, 1) if c else 0.0
+        weekday_data.append({"name": DAY_NAMES[i], "y": avg})
+
+    non_zero = [w["y"] for w in weekday_data if w["y"] > 0]
+    best_day  = DAY_NAMES[max(range(7), key=lambda i: weekday_data[i]["y"])] if non_zero else "—"
+    worst_day = DAY_NAMES[min(range(7), key=lambda i: weekday_data[i]["y"] if weekday_data[i]["y"] > 0 else 999)] if non_zero else "—"
+
+    # ── 3. Per-student trend data (for JS chart switcher) ─────────────────
+    students_raw = conn.execute(
+        "SELECT id, name FROM students WHERE is_active=1 ORDER BY name"
+    ).fetchall()
+
+    # Build a set of all school dates in the window
+    school_dates = sorted({r["date"] for r in class_rows})
+
+    student_trend_all = {}
+    for s in students_raw:
+        rows = conn.execute("""
+            SELECT date FROM attendance
+            WHERE  student_id=? AND date BETWEEN ? AND ?
+            ORDER  BY date
+        """, (s["id"], start_str, today_str)).fetchall()
+        attended_dates = {r["date"] for r in rows}
+
+        # Rolling 7-day window for smoother trend
+        actual = []
+        labels = []
+        for i, d_str in enumerate(school_dates):
+            window = school_dates[max(0, i-6):i+1]
+            n_present = sum(1 for dd in window if dd in attended_dates)
+            pct = round(n_present / len(window) * 100, 1)
+            actual.append(pct)
+            labels.append(d_str[5:])   # MM-DD
+
+        student_trend_all[str(s["id"])] = {
+            "labels": labels,
+            "actual": actual,
+        }
+
+    # ── 4. At-risk predictions ─────────────────────────────────────────────
+    threshold   = float(get_setting("absent_threshold", "75"))
+    at_risk_predictions = []
+
+    for s in students_raw:
+        all_rows = conn.execute("""
+            SELECT date, status FROM attendance
+            WHERE  student_id=? AND date BETWEEN ? AND ?
+            ORDER  BY date
+        """, (s["id"], start_str, today_str)).fetchall()
+
+        attended_dates = {r["date"] for r in all_rows}
+        total  = len(school_dates)
+        attend = sum(1 for d in school_dates if d in attended_dates)
+        pct    = round(attend / total * 100, 1) if total else 0.0
+
+        # Trend: compare first and second half
+        half = max(1, total // 2)
+        first_half  = school_dates[:half]
+        second_half = school_dates[half:]
+        r1 = sum(1 for d in first_half  if d in attended_dates) / len(first_half) * 100 if first_half else 0
+        r2 = sum(1 for d in second_half if d in attended_dates) / len(second_half)* 100 if second_half else 0
+        weekly_trend = round((r2 - r1) / max(1, days / 7), 1)   # % change per week
+
+        # Project 14 days
+        projected = round(max(0, min(100, pct + weekly_trend * 2)), 1)
+
+        # Consecutive absences at tail
+        consec = 0
+        for d in reversed(school_dates):
+            if d not in attended_dates:
+                consec += 1
+            else:
+                break
+
+        at_risk_predictions.append({
+            "name":                s["name"],
+            "pct":                 pct,
+            "trend":               weekly_trend,
+            "projected":           projected,
+            "consecutive_absences": consec,
+        })
+
+    # Sort: critical first, then by projected %
+    at_risk_predictions.sort(key=lambda x: x["projected"])
+
+    # ── 5. Absentee leaderboard (top 10 worst) ────────────────────────────
+    leaderboard = sorted(at_risk_predictions, key=lambda x: x["pct"])[:10]
+
+    # ── 6. KPI strip ──────────────────────────────────────────────────────
+    all_pcts = [s["pct"] for s in at_risk_predictions]
+    avg_pct  = round(sum(all_pcts) / len(all_pcts), 1) if all_pcts else 0.0
+    at_risk_count  = sum(1 for s in at_risk_predictions if s["pct"] < threshold)
+    critical_count = sum(1 for s in at_risk_predictions if s["pct"] < 60)
+
+    conn.close()
+
+    kpi = {
+        "avg_pct":       avg_pct,
+        "at_risk_count": at_risk_count,
+        "critical_count":critical_count,
+        "best_day":      best_day,
+        "worst_day":     worst_day,
+        "total_sessions":len(school_dates),
+    }
+
+    return render_template(
+        "analytics.html",
+        days                = days,
+        kpi                 = kpi,
+        class_trend_labels  = class_trend_labels,
+        class_trend_data    = class_trend_data,
+        weekday_data        = weekday_data,
+        students            = [dict(s) for s in students_raw],
+        student_trend_all   = student_trend_all,
+        at_risk_predictions = at_risk_predictions,
+        leaderboard         = leaderboard,
+        today               = today_str,
+        active_page         = "analytics",
+    )
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

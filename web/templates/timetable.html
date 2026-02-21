@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+{% block title %}Timetable Manager{% endblock %}
+
+{% block content %}
+<style>
+/* ── RESET & BASE ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+.tt-page { padding: 28px 0; }
+
+.tt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 28px;
+}
+.tt-header h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.tt-header h2 i { color: #0ef0c8; }
+
+/* ── CARDS ────────────────────────────────────────────────── */
+.tt-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+.tt-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin: 0 0 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.tt-card-title i { color: #0ef0c8; font-size: 14px; }
+
+/* ── FORM ELEMENTS — HIGH CONTRAST ───────────────────────── */
+.tt-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    align-items: end;
+}
+
+.tt-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+}
+
+.tt-field input,
+.tt-field select {
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #f8fafc;                          /* bright white text */
+    background: rgba(255,255,255,0.12);      /* visible background */
+    border: 1.5px solid rgba(255,255,255,0.28); /* clear border */
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.tt-field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f8fafc' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+}
+
+/* Select option colour (works in most browsers) */
+.tt-field select option {
+    background: #1e2a3a;
+    color: #f8fafc;
+}
+
+.tt-field input:focus,
+.tt-field select:focus {
+    border-color: #0ef0c8;
+    background: rgba(14,240,200,0.08);
+    box-shadow: 0 0 0 3px rgba(14,240,200,0.12);
+}
+
+.tt-field input::placeholder { color: rgba(255,255,255,0.35); }
+
+/* time input calendar icon colour */
+.tt-field input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.6);
+    cursor: pointer;
+}
+
+/* ── BUTTONS ──────────────────────────────────────────────── */
+.tt-btn-primary {
+    padding: 11px 28px;
+    background: linear-gradient(135deg, #0ef0c8, #00bfa5);
+    color: #0a1628;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: opacity 0.2s, transform 0.15s;
+    white-space: nowrap;
+}
+.tt-btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+.tt-btn-danger {
+    padding: 6px 14px;
+    background: rgba(239,68,68,0.15);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.tt-btn-danger:hover { background: rgba(239,68,68,0.28); }
+
+/* ── WEEKLY GRID ──────────────────────────────────────────── */
+.tt-grid-wrapper {
+    overflow-x: auto;
+    border-radius: 12px;
+}
+
+.tt-grid {
+    min-width: 700px;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tt-grid th {
+    padding: 12px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    text-align: center;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.tt-grid th.today-col {
+    color: #0ef0c8;
+    background: rgba(14,240,200,0.06);
+}
+
+.tt-grid th:first-child {
+    text-align: left;
+    padding-left: 16px;
+    width: 90px;
+}
+
+.tt-grid td {
+    vertical-align: top;
+    padding: 8px 6px;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.tt-grid td:first-child {
+    padding-left: 16px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    vertical-align: middle;
+    text-align: left;
+    white-space: nowrap;
+    width: 90px;
+    background: rgba(255,255,255,0.02);
+}
+
+.tt-grid tr:last-child td { border-bottom: none; }
+
+/* Period pill inside grid */
+.tt-period-pill {
+    display: flex;
+    flex-direction: column;
+    padding: 9px 11px;
+    border-radius: 9px;
+    border-left: 3px solid;
+    margin-bottom: 4px;
+    position: relative;
+    cursor: default;
+    transition: transform 0.15s;
+}
+.tt-period-pill:hover { transform: translateY(-1px); }
+
+.tt-period-pill .pill-subject {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tt-period-pill .pill-time {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 2px;
+}
+
+.tt-period-pill .pill-del {
+    position: absolute;
+    top: 5px; right: 6px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.3);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+.tt-period-pill .pill-del:hover { color: #f87171; }
+
+/* Active glow */
+.tt-period-pill.is-active {
+    animation: pillGlow 2s ease-in-out infinite alternate;
+}
+@keyframes pillGlow {
+    from { box-shadow: 0 0 4px rgba(14,240,200,0.3); }
+    to   { box-shadow: 0 0 10px rgba(14,240,200,0.55); }
+}
+
+/* ── SUBJECT LIST TABLE ────────────────────────────────────── */
+.tt-subject-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.tt-subject-table th {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.tt-subject-table td {
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #f0f4f8;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: middle;
+}
+.tt-subject-table tr:last-child td { border-bottom: none; }
+.tt-subject-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+.subj-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* Conflict banner */
+#conflict-banner {
+    display: none;
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #fca5a5;
+    margin-bottom: 16px;
+}
+
+/* Empty cell placeholder */
+.tt-empty { color: rgba(255,255,255,0.15); font-size: 11px; text-align: center; padding: 6px 0; }
+</style>
+
+<div class="tt-page">
+    <div class="tt-header">
+        <h2><i class="fas fa-calendar-alt"></i> Timetable Manager</h2>
+        <a href="/" class="tt-btn-primary" style="text-decoration:none;font-size:13px;">
+            <i class="fas fa-arrow-left" style="margin-right:6px;"></i>Dashboard
+        </a>
+    </div>
+
+    <!-- ── ADD SUBJECT ──────────────────────────────────────── -->
+    <div class="tt-card">
+        <p class="tt-card-title"><i class="fas fa-book"></i> Add Subject</p>
+        <form method="POST" action="/timetable/add_subject">
+            <div class="tt-form-grid">
+                <div class="tt-field">
+                    <label>Subject Name</label>
+                    <input type="text" name="name" placeholder="e.g. Mathematics" required>
+                </div>
+                <div class="tt-field">
+                    <label>Subject Code</label>
+                    <input type="text" name="code" placeholder="e.g. MATH101">
+                </div>
+                <div class="tt-field">
+                    <label>Teacher / Instructor</label>
+                    <input type="text" name="teacher" placeholder="e.g. Dr. Sharma">
+                </div>
+                <div class="tt-field" style="display:flex;align-items:flex-end;">
+                    <button type="submit" class="tt-btn-primary" style="width:100%;">
+                        <i class="fas fa-plus" style="margin-right:6px;"></i>Add Subject
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── ADD PERIOD ───────────────────────────────────────── -->
+    <div class="tt-card">
+        <p class="tt-card-title"><i class="fas fa-clock"></i> Schedule a Period</p>
+
+        <div id="conflict-banner">
+            <i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>
+            <span id="conflict-msg"></span>
+        </div>
+
+        <form method="POST" action="/timetable/add_period" id="period-form">
+            <div class="tt-form-grid">
+                <div class="tt-field">
+                    <label>Subject</label>
+                    <select name="subject_id" required>
+                        <option value="">— Select subject —</option>
+                        {% for s in subjects %}
+                        <option value="{{ s.id }}">{{ s.name }}{% if s.code %} ({{ s.code }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="tt-field">
+                    <label>Day of Week</label>
+                    <select name="day_of_week" id="dow-select" required>
+                        <option value="0">Monday</option>
+                        <option value="1">Tuesday</option>
+                        <option value="2">Wednesday</option>
+                        <option value="3">Thursday</option>
+                        <option value="4">Friday</option>
+                        <option value="5">Saturday</option>
+                        <option value="6">Sunday</option>
+                    </select>
+                </div>
+                <div class="tt-field">
+                    <label>Start Time</label>
+                    <input type="time" name="start_time" id="start-time" required>
+                </div>
+                <div class="tt-field">
+                    <label>End Time</label>
+                    <input type="time" name="end_time" id="end-time" required>
+                </div>
+                <div class="tt-field" style="display:flex;align-items:flex-end;">
+                    <button type="submit" class="tt-btn-primary" style="width:100%;">
+                        <i class="fas fa-calendar-plus" style="margin-right:6px;"></i>Add Period
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── WEEKLY TIMETABLE GRID ─────────────────────────────── -->
+    <div class="tt-card">
+        <p class="tt-card-title"><i class="fas fa-table"></i> Weekly Timetable</p>
+
+        {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+        {% set now_dow = today_dow if today_dow is defined else none %}
+
+        {% set COLORS = [
+            ('rgba(14,240,200,0.12)','#0ef0c8'),
+            ('rgba(99,179,237,0.12)','#63b3ed'),
+            ('rgba(252,129,74,0.14)','#fc814a'),
+            ('rgba(154,117,248,0.12)','#9a75f8'),
+            ('rgba(250,204,21,0.12)','#facc15'),
+            ('rgba(248,113,113,0.12)','#f87171'),
+            ('rgba(52,211,153,0.12)','#34d399'),
+            ('rgba(236,72,153,0.12)','#ec4899'),
+            ('rgba(56,189,248,0.12)','#38bdf8'),
+            ('rgba(251,146,60,0.12)','#fb923c')
+        ] %}
+
+        <div class="tt-grid-wrapper">
+        {% if timetable %}
+            {# Build a time slot list #}
+            {% set times = [] %}
+            {% for entry in timetable %}
+                {% if entry.start_time not in times %}{% set _ = times.append(entry.start_time) %}{% endif %}
+            {% endfor %}
+            {% set times = times | sort %}
+
+            <table class="tt-grid">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        {% for i in range(7) %}
+                        <th class="{{ 'today-col' if now_dow == i else '' }}">
+                            {{ days[i] }}
+                            {% if now_dow == i %}<br><span style="font-size:9px;color:#0ef0c8;">▶ TODAY</span>{% endif %}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for slot in times %}
+                    <tr>
+                        <td>{{ slot }}</td>
+                        {% for day_i in range(7) %}
+                        <td>
+                            {% set found = [] %}
+                            {% for entry in timetable %}
+                                {% if entry.day_of_week == day_i and entry.start_time == slot %}
+                                    {% set cidx = (entry.subject_id % 10) %}
+                                    {% set c = COLORS[cidx] %}
+                                    {% set _ = found.append(entry) %}
+                                    <div class="tt-period-pill {{ 'is-active' if entry.is_now else '' }}"
+                                         style="background:{{ c[0] }};border-left-color:{{ c[1] }};">
+                                        <span class="pill-subject">{{ entry.subject_name }}</span>
+                                        <span class="pill-time">{{ entry.start_time }} – {{ entry.end_time }}</span>
+                                        <form method="POST" action="/timetable/delete/{{ entry.id }}" style="display:inline;">
+                                            <button type="submit" class="pill-del" title="Remove">✕</button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                            {% if not found %}
+                            <span class="tt-empty">·</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        {% else %}
+            <!-- ── DEMO GRID (shown when no timetable data yet) ── -->
+            {% set demo = [
+                {'subject':'Mathematics','code':'MATH','day':0,'start':'08:00','end':'09:00','sid':0},
+                {'subject':'Physics','code':'PHY','day':0,'start':'09:15','end':'10:15','sid':1},
+                {'subject':'Chemistry','code':'CHEM','day':1,'start':'08:00','end':'09:00','sid':2},
+                {'subject':'English','code':'ENG','day':1,'start':'10:30','end':'11:30','sid':3},
+                {'subject':'Mathematics','code':'MATH','day':2,'start':'08:00','end':'09:00','sid':0},
+                {'subject':'Computer Sc.','code':'CS','day':2,'start':'11:00','end':'12:00','sid':4},
+                {'subject':'Biology','code':'BIO','day':3,'start':'09:00','end':'10:00','sid':5},
+                {'subject':'Physics','code':'PHY','day':3,'start':'10:15','end':'11:15','sid':1},
+                {'subject':'English','code':'ENG','day':4,'start':'08:00','end':'09:00','sid':3},
+                {'subject':'Computer Sc.','code':'CS','day':4,'start':'09:15','end':'10:15','sid':4},
+                {'subject':'Chemistry','code':'CHEM','day':5,'start':'08:00','end':'09:00','sid':2},
+            ] %}
+
+            {% set demo_times = ['08:00','09:00','09:15','10:00','10:15','10:30','11:00','11:15','11:30','12:00'] | sort %}
+
+            <div style="
+                background:rgba(255,200,50,0.08);
+                border:1px dashed rgba(255,200,50,0.3);
+                border-radius:10px;
+                padding:10px 16px;
+                font-size:12px;
+                color:rgba(255,200,100,0.8);
+                margin-bottom:16px;
+                display:flex;align-items:center;gap:8px;">
+                <i class="fas fa-info-circle"></i>
+                <span>Demo timetable shown. Add subjects and schedule periods above to create your real timetable.</span>
+            </div>
+
+            <table class="tt-grid">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        {% for i in range(7) %}
+                        <th class="{{ 'today-col' if now_dow == i else '' }}">
+                            {{ days[i] }}
+                            {% if now_dow == i %}<br><span style="font-size:9px;color:#0ef0c8;">▶ TODAY</span>{% endif %}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for slot in demo_times %}
+                    <tr>
+                        <td>{{ slot }}</td>
+                        {% for day_i in range(7) %}
+                        <td>
+                            {% set found = [] %}
+                            {% for entry in demo %}
+                                {% if entry.day == day_i and entry.start == slot %}
+                                    {% set cidx = entry.sid % 10 %}
+                                    {% set c = COLORS[cidx] %}
+                                    {% set _ = found.append(entry) %}
+                                    <div class="tt-period-pill" style="background:{{ c[0] }};border-left-color:{{ c[1] }};">
+                                        <span class="pill-subject">{{ entry.subject }}</span>
+                                        <span class="pill-time">{{ entry.start }} – {{ entry.end }}</span>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                            {% if not found %}<span class="tt-empty">·</span>{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        </div>
+    </div>
+
+    <!-- ── SUBJECTS LIST ────────────────────────────────────── -->
+    {% if subjects %}
+    <div class="tt-card">
+        <p class="tt-card-title"><i class="fas fa-list-ul"></i> Subjects</p>
+        <table class="tt-subject-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Subject</th>
+                    <th>Code</th>
+                    <th>Teacher</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in subjects %}
+                {% set cidx = loop.index0 % 10 %}
+                {% set c = COLORS[cidx] %}
+                <tr>
+                    <td style="color:rgba(255,255,255,0.3);font-size:12px;">{{ loop.index }}</td>
+                    <td>
+                        <span class="subj-badge" style="background:{{ c[0] }};color:{{ c[1] }};border:1px solid {{ c[1] }}33;">
+                            {{ s.name }}
+                        </span>
+                    </td>
+                    <td style="font-family:monospace;font-size:12px;color:rgba(255,255,255,0.5);">{{ s.code or '—' }}</td>
+                    <td>{{ s.teacher or '—' }}</td>
+                    <td>
+                        <form method="POST" action="/timetable/delete_subject/{{ s.id }}" style="display:inline;">
+                            <button type="submit" class="tt-btn-danger" onclick="return confirm('Delete {{ s.name }} and all its periods?')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Pre-select today's day in the dropdown
+(function(){
+    var dow = new Date().getDay(); // 0=Sun, 1=Mon...
+    var mapped = dow === 0 ? 6 : dow - 1; // convert to Mon=0
+    var sel = document.getElementById('dow-select');
+    if(sel) sel.value = mapped;
+})();
+
+// Conflict detection
+document.getElementById('period-form').addEventListener('submit', function(e){
+    var start = document.getElementById('start-time').value;
+    var end   = document.getElementById('end-time').value;
+    var banner = document.getElementById('conflict-banner');
+    var msg    = document.getElementById('conflict-msg');
+
+    if(start && end && start >= end){
+        e.preventDefault();
+        banner.style.display = 'flex';
+        msg.textContent = 'End time must be after start time.';
+        banner.style.alignItems = 'center';
+        return;
+    }
+    banner.style.display = 'none';
+});
+</script>
+{% endblock %}

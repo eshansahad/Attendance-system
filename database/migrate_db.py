@@ -1,6 +1,12 @@
 """
-Run this ONCE to upgrade your database schema.
-It is safe to run multiple times - it skips columns that already exist.
+database/migrate_db.py  ·  Priority 3 addition
+───────────────────────────────────────────────
+Run this ONCE after pulling the Priority 3 update.
+Safe to run multiple times — skips anything that already exists.
+
+New tables added:
+  subjects   — subject/course names (e.g. "CS-101", "Mathematics")
+  timetable  — period slots: subject + day-of-week + start_time + end_time
 
 Usage:
     python database/migrate_db.py
@@ -9,19 +15,19 @@ import sqlite3
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "attendance.db")
+DB_PATH  = os.path.join(BASE_DIR, "attendance.db")
 
 
 def migrate():
     if not os.path.exists(DB_PATH):
         print(f"[ERROR] Database not found at: {DB_PATH}")
-        print("[FIX] Run database/database_setup.py first.")
+        print("[FIX] Run database/fix_db.py first.")
         return
 
-    conn = sqlite3.connect(DB_PATH)
+    conn   = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # ── 1. NEW COLUMNS ON attendance TABLE ──────────────────────────────────
+    # ── 1. EXISTING COLUMNS (unchanged from before) ──────────────────────────
     existing_cols = {
         row[1]
         for row in cursor.execute("PRAGMA table_info(attendance)").fetchall()
@@ -43,7 +49,6 @@ def migrate():
         else:
             print(f"  [OK]   attendance.{col_name} already exists")
 
-    # Backfill: mark all existing rows as 'Present' where status is empty/null
     cursor.execute(
         "UPDATE attendance SET status='Present' WHERE status IS NULL OR status=''"
     )
@@ -58,19 +63,18 @@ def migrate():
     print("  [OK]   settings table ready")
 
     defaults = [
-        ("late_cutoff",         "09:00"),   # HH:MM  – mark 'Late' after this time
-        ("absent_threshold",    "75"),       # %      – warn student below this
-        ("session_name",        "General"), # default session label
+        ("late_cutoff",      "09:00"),
+        ("absent_threshold", "75"),
+        ("session_name",     "General"),
     ]
     for key, value in defaults:
         cursor.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
             (key, value)
         )
-        print(f"  [SET]  {key} = {value} (default, won't overwrite existing)")
+        print(f"  [SET]  {key} = {value} (default, won't overwrite)")
 
-    # ── 3. UNIQUE CONSTRAINT GUARD (soft – via index) ─────────────────────
-    # Prevents duplicate attendance for same student+date+session at DB level
+    # ── 3. UNIQUE INDEX on attendance ────────────────────────────────────────
     try:
         cursor.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS
@@ -81,7 +85,7 @@ def migrate():
     except sqlite3.OperationalError as e:
         print(f"  [WARN] Could not create unique index: {e}")
 
-    # ── 4. is_active COLUMN ON students TABLE ───────────────────────────────
+    # ── 4. students.is_active ────────────────────────────────────────────────
     student_cols = {
         row[1]
         for row in cursor.execute("PRAGMA table_info(students)").fetchall()
@@ -94,8 +98,7 @@ def migrate():
     else:
         print("  [OK]   students.is_active already exists")
 
-    # ── 5. student_seen COLUMN ON complaints TABLE ──────────────────────────
-    # Added after complaints table exists, so check first
+    # ── 5. COMPLAINTS TABLE ──────────────────────────────────────────────────
     try:
         complaint_cols = {
             row[1]
@@ -106,7 +109,6 @@ def migrate():
                 "ALTER TABLE complaints"
                 " ADD COLUMN student_seen INTEGER NOT NULL DEFAULT 1"
             )
-            # Existing resolved complaints default to seen=1 (no false alerts)
             cursor.execute(
                 "UPDATE complaints SET student_seen=1"
                 " WHERE status IN ('Accepted','Declined')"
@@ -115,9 +117,8 @@ def migrate():
         else:
             print("  [OK]   complaints.student_seen already exists")
     except Exception:
-        pass   # complaints table may not exist yet — created below
+        pass
 
-    # ── 6. COMPLAINTS TABLE ─────────────────────────────────────────────────
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS complaints (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,14 +130,52 @@ def migrate():
             teacher_note TEXT            DEFAULT NULL,
             created_at  TEXT    NOT NULL,
             resolved_at TEXT             DEFAULT NULL,
+            student_seen INTEGER NOT NULL DEFAULT 1,
             FOREIGN KEY(student_id) REFERENCES students(id)
         )
     """)
     print("  [OK]   complaints table ready")
 
+    # ── 6. PRIORITY 3 — SUBJECTS TABLE ───────────────────────────────────────
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS subjects (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            name       TEXT    NOT NULL UNIQUE,
+            code       TEXT    NOT NULL DEFAULT '',
+            teacher    TEXT    NOT NULL DEFAULT '',
+            is_active  INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    print("  [OK]   subjects table ready")
+
+    # ── 7. PRIORITY 3 — TIMETABLE TABLE ──────────────────────────────────────
+    # day_of_week: 0=Monday … 6=Sunday  (Python datetime.weekday() convention)
+    # start_time / end_time: stored as 'HH:MM' strings (same as late_cutoff)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS timetable (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject_id   INTEGER NOT NULL,
+            day_of_week  INTEGER NOT NULL CHECK(day_of_week BETWEEN 0 AND 6),
+            start_time   TEXT    NOT NULL,
+            end_time     TEXT    NOT NULL,
+            is_active    INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+        )
+    """)
+    print("  [OK]   timetable table ready")
+
+    # Seed a default "General" subject so existing attendance records that
+    # reference session='General' remain coherent.
+    cursor.execute(
+        "INSERT OR IGNORE INTO subjects (name, code, teacher) VALUES (?, ?, ?)",
+        ("General", "GEN", "")
+    )
+    print("  [SET]  default subject 'General' seeded")
+
     conn.commit()
     conn.close()
-    print("\n[MIGRATE] All done. Your database is up to date.")
+    print("\n[MIGRATE] All done. Database is up to date.")
 
 
 if __name__ == "__main__":

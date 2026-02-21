@@ -5,10 +5,217 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    /* ── Subject breakdown bars — all hardcoded, no CSS variable deps ────── */
+    .subj-breakdown {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 4px;
+    }
+
+    .subj-row {
+        padding: 13px 15px;
+        border-radius: 11px;
+        border-left: 3px solid;
+        transition: background 0.15s;
+    }
+
+    .subj-row.green {
+        background: rgba(16, 185, 129, 0.07);
+        border-color: #10b981;
+    }
+
+    .subj-row.amber {
+        background: rgba(245, 158, 11, 0.07);
+        border-color: #f59e0b;
+    }
+
+    .subj-row.red {
+        background: rgba(239, 68, 68, 0.07);
+        border-color: #ef4444;
+    }
+
+    .subj-row:hover {
+        filter: brightness(1.12);
+    }
+
+    .subj-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        gap: 10px;
+    }
+
+    .subj-name-text {
+        font-size: 13px;
+        font-weight: 700;
+        color: #f8fafc;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+    }
+
+    .subj-sub {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: 2px;
+        white-space: nowrap;
+    }
+
+    .subj-pct {
+        font-size: 19px;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
+
+    .subj-pct.green {
+        color: #10b981;
+    }
+
+    .subj-pct.amber {
+        color: #f59e0b;
+    }
+
+    .subj-pct.red {
+        color: #ef4444;
+    }
+
+    .subj-bar-track {
+        height: 5px;
+        background: rgba(255, 255, 255, 0.07);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .subj-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.6s ease;
+    }
+
+    .subj-bar-fill.green {
+        background: #10b981;
+    }
+
+    .subj-bar-fill.amber {
+        background: #f59e0b;
+    }
+
+    .subj-bar-fill.red {
+        background: #ef4444;
+    }
+
+    .subj-warn {
+        margin-top: 7px;
+        font-size: 11px;
+        color: #fca5a5;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    /* ── Today's schedule pills ──────────────────────────────────────────── */
+    .sd-schedule-wrap {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        padding: 16px 20px;
+        margin-bottom: 22px;
+    }
+
+    .sd-schedule-head {
+        font-size: 14px;
+        font-weight: 700;
+        color: #f8fafc;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .sd-schedule-head i {
+        color: #0ef0c8;
+        font-size: 13px;
+    }
+
+    .sd-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .sd-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        flex: 1;
+        min-width: 130px;
+    }
+
+    .sd-pill.active {
+        background: rgba(14, 240, 200, 0.09);
+        border-color: rgba(14, 240, 200, 0.3);
+        color: #0ef0c8;
+    }
+
+    .sd-pill.upcoming {
+        background: rgba(255, 155, 68, 0.08);
+        border-color: rgba(255, 155, 68, 0.25);
+        color: #ff9b44;
+    }
+
+    .sd-pill.ended {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.35);
+    }
+
+    .sd-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .sd-pill.active .sd-dot {
+        background: #0ef0c8;
+        box-shadow: 0 0 6px #0ef0c8;
+        animation: sdDot 1.5s ease-in-out infinite;
+    }
+
+    .sd-pill.upcoming .sd-dot {
+        background: #ff9b44;
+    }
+
+    .sd-pill.ended .sd-dot {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    @keyframes sdDot {
+
+        0%,
+        100% {
+            opacity: 1
+        }
+
+        50% {
+            opacity: 0.35
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
 
+<!-- Welcome -->
 <div class="welcome-banner" style="margin-bottom:24px;">
     <div class="user-avatar orange">
         <i class="fas fa-user-graduate"></i>
@@ -25,11 +232,271 @@
     <div>
         <strong>Low Attendance Warning</strong>
         <p>Your attendance is {{ stats.percentage }}%, which is below the required
-           {{ stats.threshold|int }}%. Please attend more classes to avoid issues.</p>
+            {{ stats.threshold|int }}%. Please attend more classes to avoid issues.</p>
     </div>
 </div>
 {% endif %}
 
+<!-- ── TODAY'S SCHEDULE ────────────────────────────────────────────────── -->
+{% if today_schedule %}
+<div class="sd-schedule-wrap">
+    <div class="sd-schedule-head">
+        <i class="fas fa-calendar-day"></i>
+        Today's Classes
+        {% set active_p = today_schedule | selectattr('status','equalto','active') | list %}
+        {% if active_p %}
+        <span style="
+            margin-left:auto;font-size:11px;font-weight:700;
+            color:#0ef0c8;background:rgba(14,240,200,0.1);
+            border:1px solid rgba(14,240,200,0.25);
+            border-radius:20px;padding:3px 11px;
+            display:flex;align-items:center;gap:5px;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#0ef0c8;
+                         animation:sdDot 1.5s ease-in-out infinite;display:inline-block;"></span>
+            Now: {{ active_p[0].subject_name }}
+        </span>
+        {% endif %}
+    </div>
+    <div class="sd-pills">
+        {% for p in today_schedule %}
+        <div class="sd-pill {{ p.status }}">
+            <span class="sd-dot"></span>
+            <div style="flex:1;min-width:0;">
+                <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    {{ p.subject_code or p.subject_name }}
+                </div>
+                <div style="font-weight:400;font-size:11px;opacity:0.75;margin-top:1px;">
+                    {{ p.start_time }}–{{ p.end_time }}
+                </div>
+            </div>
+            {% if p.status == 'active' %}
+            <span style="font-size:9px;font-weight:800;background:rgba(14,240,200,0.2);
+                         border-radius:4px;padding:1px 5px;letter-spacing:0.06em;flex-shrink:0;">LIVE</span>
+            {% elif p.status == 'upcoming' %}
+            <span style="font-size:9px;font-weight:700;opacity:0.75;flex-shrink:0;">NEXT</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ── WEEKLY TIMETABLE (Student View) ──────────────────────────────────── -->
+{% if timetable %}
+<style>
+    .sd-week-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        border-radius: 16px;
+        padding: 20px 22px;
+        margin-bottom: 22px;
+        overflow: hidden;
+    }
+
+    .sd-week-card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+    }
+
+    .sd-week-card-head h4 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: #f8fafc;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sd-week-card-head h4 i {
+        color: #0ef0c8;
+    }
+
+    .sd-week-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 9px;
+        min-width: 560px;
+    }
+
+    .sd-day-col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .sd-day-hdr {
+        font-size: 11px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.6);
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 8px 4px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.11);
+    }
+
+    .sd-day-hdr.sd-today {
+        background: rgba(14, 240, 200, 0.14);
+        color: #0ef0c8;
+        border-color: rgba(14, 240, 200, 0.35);
+    }
+
+    .sd-period-blk {
+        padding: 8px 9px 8px 11px;
+        border-radius: 9px;
+        border-left: 4px solid;
+        font-size: 12px;
+        box-shadow: 0 2px 7px rgba(0, 0, 0, 0.18);
+        transition: filter 0.15s;
+        position: relative;
+    }
+
+    .sd-period-blk:hover {
+        filter: brightness(1.15);
+    }
+
+    .sd-period-blk.sd-active-blk {
+        box-shadow: 0 2px 12px rgba(14, 240, 200, 0.18);
+    }
+
+    .sd-period-blk.sd-active-blk .sd-pb-subj {
+        color: #0ef0c8;
+    }
+
+    .sd-pb-subj {
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sd-pb-time {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.65);
+        margin-top: 3px;
+        font-weight: 500;
+    }
+
+    .sd-live-dot {
+        position: absolute;
+        top: 5px;
+        right: 6px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #0ef0c8;
+        box-shadow: 0 0 6px #0ef0c8;
+        animation: sdDot 1.5s ease-in-out infinite;
+    }
+
+    .sd-empty-blk {
+        text-align: center;
+        padding: 13px 4px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.2);
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        border-radius: 9px;
+    }
+
+    /* period colours */
+    .sdpc0 {
+        border-left-color: #0ef0c8;
+        background: rgba(14, 240, 200, 0.11)
+    }
+
+    .sdpc1 {
+        border-left-color: #ff9b44;
+        background: rgba(255, 155, 68, 0.13)
+    }
+
+    .sdpc2 {
+        border-left-color: #c084fc;
+        background: rgba(192, 132, 252, 0.11)
+    }
+
+    .sdpc3 {
+        border-left-color: #60a5fa;
+        background: rgba(96, 165, 250, 0.11)
+    }
+
+    .sdpc4 {
+        border-left-color: #f472b6;
+        background: rgba(244, 114, 182, 0.11)
+    }
+
+    .sdpc5 {
+        border-left-color: #34d399;
+        background: rgba(52, 211, 153, 0.11)
+    }
+
+    .sdpc6 {
+        border-left-color: #fbbf24;
+        background: rgba(251, 191, 36, 0.11)
+    }
+
+    .sdpc7 {
+        border-left-color: #a78bfa;
+        background: rgba(167, 139, 250, 0.11)
+    }
+
+    .sdpc8 {
+        border-left-color: #fb923c;
+        background: rgba(251, 146, 60, 0.11)
+    }
+
+    .sdpc9 {
+        border-left-color: #22d3ee;
+        background: rgba(34, 211, 238, 0.11)
+    }
+</style>
+
+<div class="sd-week-card">
+    <div class="sd-week-card-head">
+        <h4><i class="fas fa-calendar-week"></i> Weekly Timetable</h4>
+        <span style="font-size:11px;color:rgba(255,255,255,0.35);">
+            {{ timetable | length }} period{{ 's' if timetable|length != 1 else '' }}
+        </span>
+    </div>
+    <div style="overflow-x:auto;">
+        <div class="sd-week-grid">
+            {% set day_names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+            {% for d in range(7) %}
+            <div class="sd-day-col">
+                <div class="sd-day-hdr {% if d == today_dow %}sd-today{% endif %}">
+                    {{ day_names[d] }}
+                    {% if d == today_dow %}<br><span style="font-size:9px;opacity:0.7;">TODAY</span>{% endif %}
+                </div>
+                {% set day_ps = timetable | selectattr('day_of_week','equalto',d) | sort(attribute='start_time') | list
+                %}
+                {% if day_ps %}
+                {% for p in day_ps %}
+                {% set ci = p.subject_id % 10 %}
+                {% set is_live = d == today_dow and today_schedule and (today_schedule |
+                selectattr('subject_name','equalto',p.subject_name) | selectattr('status','equalto','active') | list) %}
+                <div class="sd-period-blk sdpc{{ ci }} {% if is_live %}sd-active-blk{% endif %}">
+                    <div class="sd-pb-subj" title="{{ p.subject_name }}">{{ p.subject_code or p.subject_name }}</div>
+                    <div class="sd-pb-time">{{ p.start_time }}–{{ p.end_time }}</div>
+                    {% if is_live %}<span class="sd-live-dot"></span>{% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="sd-empty-blk">—</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Stats -->
 <div class="stats-grid" style="margin-bottom:28px;">
     <div class="card" style="border-left:4px solid #10b981;">
         <span>Present</span>
@@ -45,12 +512,12 @@
     </div>
     <div class="card attendance-card">
         <span>Overall</span>
-        <div class="percentage-text"
-             style="color:{% if stats.below_threshold %}#ef4444{% else %}#ff9b44{% endif %};">
+        <div class="percentage-text" style="color:{% if stats.below_threshold %}#ef4444{% else %}#ff9b44{% endif %};">
             {{ stats.percentage }}%
         </div>
         <div class="progress-bar">
-            <div class="progress-fill" style="width:{{ stats.percentage }}%;
+            <div class="progress-fill"
+                style="width:{{ stats.percentage }}%;
                  background:{% if stats.below_threshold %}linear-gradient(90deg,#ef4444,#f97316){% else %}linear-gradient(90deg,#ff9b44,#03a9f4){% endif %};">
             </div>
         </div>
@@ -60,65 +527,52 @@
 
 <div class="student-grid">
 
-    <!-- Calendar -->
+    <!-- ── LEFT: Calendar ─────────────────────────────────────────────── -->
     <div>
         <div class="table-card">
-
-            <!-- Header with navigation -->
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+            <div
+                style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
                 <h3 style="margin:0;"><i class="fas fa-calendar-alt"></i> {{ month_year }}</h3>
-
                 <div style="display:flex;gap:8px;align-items:center;">
-                    <!-- Prev month -->
-                    <a href="/student_dashboard?year={{ prev_year }}&month={{ prev_month }}"
-                       class="cal-nav-btn" title="Previous month">
+                    <a href="/student_dashboard?year={{ prev_year }}&month={{ prev_month }}" class="cal-nav-btn"
+                        title="Previous month">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-
-                    <!-- Month + Year dropdowns -->
-                    <form method="GET" action="/student_dashboard"
-                          style="display:flex;gap:6px;align-items:center;">
-                        <select name="month" onchange="this.form.submit()"
-                                style="padding:5px 10px;border-radius:8px;
+                    <form method="GET" action="/student_dashboard" style="display:flex;gap:6px;align-items:center;">
+                        <select name="month" onchange="this.form.submit()" style="padding:5px 10px;border-radius:8px;
                                        background:rgba(255,255,255,0.06);
-                                       border:1px solid var(--glass-border);
-                                       color:var(--text-primary);
+                                       border:1px solid rgba(255,255,255,0.15);
+                                       color:#f8fafc;
                                        font-family:inherit;font-size:13px;cursor:pointer;">
                             {% for m in range(1, 13) %}
-                            <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>
+                            <option value="{{ m }}" {% if m==current_month %}selected{% endif %}>
                                 {{ month_names[m-1] }}
                             </option>
                             {% endfor %}
                         </select>
-                        <select name="year" onchange="this.form.submit()"
-                                style="padding:5px 10px;border-radius:8px;
+                        <select name="year" onchange="this.form.submit()" style="padding:5px 10px;border-radius:8px;
                                        background:rgba(255,255,255,0.06);
-                                       border:1px solid var(--glass-border);
-                                       color:var(--text-primary);
+                                       border:1px solid rgba(255,255,255,0.15);
+                                       color:#f8fafc;
                                        font-family:inherit;font-size:13px;cursor:pointer;">
                             {% for y in year_range %}
-                            <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>
+                            <option value="{{ y }}" {% if y==current_year %}selected{% endif %}>
                                 {{ y }}
                             </option>
                             {% endfor %}
                         </select>
                     </form>
-
-                    <!-- Next month -->
-                    <a href="/student_dashboard?year={{ next_year }}&month={{ next_month }}"
-                       class="cal-nav-btn" title="Next month">
+                    <a href="/student_dashboard?year={{ next_year }}&month={{ next_month }}" class="cal-nav-btn"
+                        title="Next month">
                         <i class="fas fa-chevron-right"></i>
                     </a>
-
-                    <!-- Back to today -->
                     <a href="/student_dashboard" class="cal-nav-btn" title="Go to today"
-                       style="font-size:11px;padding:6px 10px;width:auto;border-radius:8px;">
+                        style="font-size:11px;padding:6px 10px;width:auto;border-radius:8px;">
                         Today
                     </a>
                 </div>
             </div>
 
-            <!-- Legend -->
             <div class="cal-legend">
                 <span><span class="cal-dot present"></span> Present</span>
                 <span><span class="cal-dot late"></span> Late</span>
@@ -127,31 +581,29 @@
                 <span><span class="cal-dot future"></span> Upcoming</span>
             </div>
 
-            <!-- Grid -->
             <div class="cal-grid">
                 {% for day in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
-                    <div class="cal-header">{{ day }}</div>
+                <div class="cal-header">{{ day }}</div>
                 {% endfor %}
-
                 {% for week in cal_weeks %}
-                    {% for cell in week %}
-                        {% if cell is none %}
-                            <div class="cal-cell empty"></div>
-                        {% else %}
-                            <div class="cal-cell {{ cell.status }}"
-                                 title="{{ cell.date }} – {{ cell.status|capitalize }}">
-                                {{ cell.day }}
-                            </div>
-                        {% endif %}
-                    {% endfor %}
+                {% for cell in week %}
+                {% if cell is none %}
+                <div class="cal-cell empty"></div>
+                {% else %}
+                <div class="cal-cell {{ cell.status }}" title="{{ cell.date }} – {{ cell.status|capitalize }}">
+                    {{ cell.day }}
+                </div>
+                {% endif %}
+                {% endfor %}
                 {% endfor %}
             </div>
-
         </div>
     </div>
 
-    <!-- Right column -->
+    <!-- ── RIGHT: Donut + Recent + Subject Breakdown ──────────────────── -->
     <div>
+
+        <!-- Donut chart -->
         <div class="table-card sticky-card" style="margin-bottom:24px;">
             <h3><i class="fas fa-chart-pie"></i> Breakdown</h3>
             {% if stats.total > 0 %}
@@ -170,12 +622,17 @@
             {% endif %}
         </div>
 
-        <div class="table-card">
+        <!-- Recent Check-ins -->
+        <div class="table-card" style="margin-bottom:24px;">
             <h3><i class="fas fa-history"></i> Recent Check-ins</h3>
             {% if recent %}
             <table style="font-size:13px;">
                 <thead>
-                    <tr><th>Date</th><th>Time</th><th>Status</th></tr>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {% for r in recent %}
@@ -184,11 +641,11 @@
                         <td>{{ r["time"][:5] }}</td>
                         <td>
                             {% if r["status"] == "Present" %}
-                                <span class="badge badge-present">Present</span>
+                            <span class="badge badge-present">Present</span>
                             {% elif r["status"] == "Late" %}
-                                <span class="badge badge-late">Late</span>
+                            <span class="badge badge-late">Late</span>
                             {% else %}
-                                <span class="badge badge-absent">{{ r["status"] }}</span>
+                            <span class="badge badge-absent">{{ r["status"] }}</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -202,34 +659,88 @@
             </div>
             {% endif %}
         </div>
-    </div>
 
-</div>
+        <!-- ── SUBJECT ATTENDANCE BREAKDOWN ───────────────────────────── -->
+        {% if subject_stats %}
+        <div class="table-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <h3 style="margin:0;">
+                    <i class="fas fa-chart-bar" style="color:#0ef0c8;"></i>
+                    By Subject
+                </h3>
+                <span style="font-size:11px;color:rgba(255,255,255,0.35);">
+                    {{ subject_stats | length }} subject{{ 's' if subject_stats|length != 1 else '' }}
+                </span>
+            </div>
+            <div class="subj-breakdown">
+                {% for s in subject_stats %}
+                {% set pct = s.percentage %}
+                {% if pct >= 85 %}
+                {% set tier = 'green' %}
+                {% elif pct >= 75 %}
+                {% set tier = 'amber' %}
+                {% else %}
+                {% set tier = 'red' %}
+                {% endif %}
+                <div class="subj-row {{ tier }}">
+                    <div class="subj-top">
+                        <div style="flex:1;min-width:0;">
+                            <div class="subj-name-text">{{ s.subject_name }}</div>
+                            <div class="subj-sub">{{ s.attended }}/{{ s.total_classes }} classes</div>
+                        </div>
+                        <div class="subj-pct {{ tier }}">{{ pct }}%</div>
+                    </div>
+                    <div class="subj-bar-track">
+                        <div class="subj-bar-fill {{ tier }}" style="width:{{ [pct, 100]|min }}%;"></div>
+                    </div>
+                    {% if tier == 'red' %}
+                    {% set needed = ((s.total_classes * 0.75) - s.attended)|round(0,'ceil')|int %}
+                    {% if needed > 0 %}
+                    <div class="subj-warn">
+                        <i class="fas fa-exclamation-triangle" style="font-size:10px;"></i>
+                        Need {{ needed }} more class{{ 'es' if needed != 1 else '' }} to reach 75%
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div><!-- /right col -->
+
+</div><!-- /student-grid -->
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-{% if stats.total > 0 %}
-new Chart(document.getElementById('donutChart').getContext('2d'), {
-    type: 'doughnut',
-    data: {
-        labels: ['Present', 'Late', 'Absent'],
-        datasets: [{
-            data: [{{ stats.present }}, {{ stats.late }}, {{ stats.absent }}],
-            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-            borderWidth: 0,
-            hoverOffset: 6
+    {% if stats.total > 0 %}
+    new Chart(document.getElementById('donutChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Present', 'Late', 'Absent'],
+            datasets: [{
+                data: [{{ stats.present }}, {{ stats.late }}, {{ stats.absent }}],
+        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+        borderWidth: 0,
+        hoverOffset: 6
         }]
     },
-    options: {
+        options: {
         cutout: '72%',
         plugins: {
-            legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 14,
-                font: { family: 'Plus Jakarta Sans', size: 12 } } },
+            legend: {
+                position: 'bottom', labels: {
+                    color: '#94a3b8', padding: 14,
+                    font: { family: 'Plus Jakarta Sans', size: 12 }
+                }
+            },
             tooltip: { backgroundColor: '#0f172a', titleColor: '#f8fafc', bodyColor: '#94a3b8' }
         }
     }
 });
-{% endif %}
+    {% endif %}
 </script>
 {% endblock %}

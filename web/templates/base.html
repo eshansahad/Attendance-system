@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>{% block title %}Smart Attend{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_head %}{% endblock %}
@@ -42,6 +41,13 @@
         <li><a href="/report" class="{% if active_page=='reports' %}active{% endif %}">
             <i class="fas fa-file-alt"></i> Reports</a></li>
 
+        <li><a href="/analytics" class="{% if active_page=='analytics' %}active{% endif %}">
+            <i class="fas fa-chart-bar"></i> Analytics</a></li>
+
+        <!-- ── Priority 3: Timetable link ───────────────────────────────── -->
+        <li><a href="/timetable" class="{% if active_page=='timetable' %}active{% endif %}">
+            <i class="fas fa-calendar-alt"></i> Timetable</a></li>
+
         <li><a href="/settings" class="{% if active_page=='settings' %}active{% endif %}">
             <i class="fas fa-cog"></i> Settings</a></li>
 
@@ -75,7 +81,28 @@
 
     <div class="header">
         <h2 style="margin:0;font-size:18px;">{% block header_title %}Dashboard{% endblock %}</h2>
+
         <div class="user-profile" style="display:flex;align-items:center;gap:12px;">
+            <!-- Priority 3: active session badge in header (teacher only) -->
+            {% if session.role == 'teacher' and active_session_now is defined
+               and active_session_now and active_session_now != 'General' %}
+            <div style="
+                display:flex;align-items:center;gap:6px;
+                font-size:12px;font-weight:600;color:#0ef0c8;
+                background:rgba(14,240,200,0.08);
+                border:1px solid rgba(14,240,200,0.2);
+                border-radius:20px;padding:5px 12px;">
+                <span style="
+                    width:7px;height:7px;border-radius:50%;
+                    background:#0ef0c8;
+                    box-shadow:0 0 6px #0ef0c8;
+                    animation:sessionPulse 1.5s ease-in-out infinite;
+                    flex-shrink:0;">
+                </span>
+                {{ active_session_now }}
+            </div>
+            {% endif %}
+
             <span style="font-size:14px;color:var(--text-muted);">
                 {{ session.user_name or ("Teacher" if session.role=="teacher" else "Student") }}
             </span>
@@ -101,23 +128,16 @@
 
 {% block scripts %}{% endblock %}
 
-<!-- ── COMPLAINT BADGE (student only) ──────────────────────────────── -->
+<!-- ── COMPLAINT BADGE (student only) ──────────────────────────────────── -->
 {% if session.role == 'student' %}
 <style>
 .notif-badge {
-    position: absolute;
-    top: 10px;
-    right: 14px;
-    min-width: 18px;
-    height: 18px;
-    background: #ef4444;
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
+    position: absolute; top: 10px; right: 14px;
+    min-width: 18px; height: 18px;
+    background: #ef4444; color: white;
+    font-size: 10px; font-weight: 700;
     border-radius: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     padding: 0 5px;
     box-shadow: 0 0 0 2px var(--bg-dark);
     animation: badgePop 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
@@ -131,7 +151,6 @@
 (function() {
     const badge = document.getElementById('complaint-badge');
     if (!badge) return;
-
     function pollBadge() {
         fetch('/complaint/badge')
             .then(r => r.json())
@@ -145,13 +164,19 @@
             })
             .catch(() => {});
     }
-
-    // Run immediately, then every 10 seconds
     pollBadge();
     setInterval(pollBadge, 10000);
 })();
 </script>
 {% endif %}
+
+<!-- ── SESSION PULSE ANIMATION ─────────────────────────────────────────── -->
+<style>
+@keyframes sessionPulse {
+    0%,100% { opacity:1; box-shadow:0 0 6px #0ef0c8; }
+    50%      { opacity:0.5; box-shadow:0 0 12px #0ef0c8; }
+}
+</style>
 
 </body>
 </html>

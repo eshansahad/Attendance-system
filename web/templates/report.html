@@ -1,159 +1,558 @@
 {% extends "base.html" %}
-
 {% block title %}Attendance Report{% endblock %}
 {% block header_title %}Attendance Report{% endblock %}
 
+{% block extra_head %}
+<style>
+/* ── Page layout ──────────────────────────────────────── */
+.rpt-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding: 18px 22px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+}
+
+.rpt-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 140px;
+}
+
+.rpt-field label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+}
+
+.rpt-field input[type="date"],
+.rpt-field select {
+    padding: 9px 13px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #f8fafc;
+    background: rgba(255,255,255,0.10);
+    border: 1.5px solid rgba(255,255,255,0.22);
+    border-radius: 9px;
+    outline: none;
+    font-family: inherit;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+}
+
+.rpt-field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 11 11'%3E%3Cpath fill='%23f8fafc' d='M5.5 7L1 2h9z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 11px center;
+    padding-right: 32px;
+}
+
+.rpt-field select option { background: #1e2a3a; color: #f8fafc; }
+
+.rpt-field input:focus,
+.rpt-field select:focus {
+    border-color: #0ef0c8;
+    background: rgba(14,240,200,0.07);
+    box-shadow: 0 0 0 3px rgba(14,240,200,0.1);
+}
+
+.rpt-field input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.55);
+    cursor: pointer;
+}
+
+.rpt-btn {
+    padding: 10px 22px;
+    background: linear-gradient(135deg, #0ef0c8, #00bfa5);
+    color: #0a1628;
+    font-size: 13px;
+    font-weight: 700;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    transition: opacity 0.2s, transform 0.15s;
+    align-self: flex-end;
+}
+.rpt-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+.rpt-btn-export {
+    padding: 10px 18px;
+    background: rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 9px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    transition: background 0.2s, color 0.2s;
+    align-self: flex-end;
+}
+.rpt-btn-export:hover {
+    background: rgba(255,255,255,0.13);
+    color: #f8fafc;
+}
+
+/* ── Summary chips ────────────────────────────────────── */
+.rpt-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.rpt-chip {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 18px;
+    border-radius: 12px;
+    min-width: 110px;
+    flex: 1;
+    border: 1px solid;
+}
+.rpt-chip .chip-val {
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+}
+.rpt-chip .chip-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-top: 5px;
+    opacity: 0.65;
+}
+.chip-present { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); color: #10b981; }
+.chip-late    { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: #f59e0b; }
+.chip-absent  { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.25);  color: #ef4444; }
+.chip-total   { background: rgba(99,179,237,0.08); border-color: rgba(99,179,237,0.2);  color: #63b3ed; }
+
+/* ── Table ────────────────────────────────────────────── */
+.rpt-table-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 0;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.rpt-table-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.rpt-table-head h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.rpt-table-head h3 i { color: #0ef0c8; }
+
+.rpt-search {
+    padding: 8px 13px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 8px;
+    color: #f8fafc;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    width: 200px;
+    transition: border-color 0.2s;
+}
+.rpt-search:focus { border-color: #0ef0c8; }
+.rpt-search::placeholder { color: rgba(255,255,255,0.3); }
+
+table.rpt-tbl {
+    width: 100%;
+    border-collapse: collapse;
+}
+table.rpt-tbl th {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+table.rpt-tbl th:hover { color: rgba(255,255,255,0.75); }
+table.rpt-tbl th .sort-arrow { font-size: 9px; margin-left: 4px; opacity: 0.4; }
+table.rpt-tbl th.sorted { color: #0ef0c8; }
+table.rpt-tbl th.sorted .sort-arrow { opacity: 1; }
+
+table.rpt-tbl td {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle;
+}
+table.rpt-tbl tr:last-child td { border-bottom: none; }
+table.rpt-tbl tr:hover td { background: rgba(255,255,255,0.025); }
+
+.rpt-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+.badge-present { background: rgba(16,185,129,0.15);  color: #10b981; }
+.badge-late    { background: rgba(245,158,11,0.15);  color: #f59e0b; }
+.badge-absent  { background: rgba(239,68,68,0.12);   color: #ef4444; }
+
+.conf-bar-wrap {
+    width: 70px;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+.conf-bar { height: 100%; border-radius: 2px; background: #0ef0c8; }
+
+/* ── Override modal ───────────────────────────────────── */
+.modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 9000;
+    align-items: center;
+    justify-content: center;
+}
+.modal-bg.open { display: flex; }
+
+.modal-box {
+    background: #1a2540;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 18px;
+    padding: 28px 30px;
+    width: 440px;
+    max-width: 96vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.modal-box h4 {
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.modal-box h4 i { color: #0ef0c8; }
+
+.modal-field { margin-bottom: 16px; }
+.modal-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+}
+.modal-field select,
+.modal-field input,
+.modal-field textarea {
+    width: 100%;
+    padding: 10px 13px;
+    background: rgba(255,255,255,0.1);
+    border: 1.5px solid rgba(255,255,255,0.22);
+    border-radius: 9px;
+    color: #f8fafc;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: vertical;
+}
+.modal-field select option { background: #1a2540; }
+.modal-field select:focus,
+.modal-field input:focus,
+.modal-field textarea:focus {
+    border-color: #0ef0c8;
+    box-shadow: 0 0 0 3px rgba(14,240,200,0.1);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 22px;
+}
+.modal-cancel {
+    padding: 9px 20px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 8px;
+    color: rgba(255,255,255,0.65);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.modal-cancel:hover { background: rgba(255,255,255,0.12); }
+.modal-save {
+    padding: 9px 22px;
+    background: linear-gradient(135deg, #0ef0c8, #00bfa5);
+    border: none;
+    border-radius: 8px;
+    color: #0a1628;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.modal-save:hover { opacity: 0.88; }
+
+.no-data-row td {
+    text-align: center;
+    padding: 40px;
+    color: rgba(255,255,255,0.25);
+    font-size: 14px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 
-<!-- Header controls -->
-<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;">
+<!-- ── FILTER TOOLBAR ──────────────────────────────────────────────── -->
+<form method="GET" action="/report" id="filter-form">
+    <div class="rpt-toolbar">
 
-    <!-- Date picker -->
-    <form method="GET" action="/report" style="display:flex;gap:10px;align-items:center;">
-        <label style="color:var(--text-muted);font-size:13px;margin:0;">Date:</label>
-        <input type="date" name="date" value="{{ report_date }}"
-               style="padding:8px 12px;border-radius:10px;
-                      background:rgba(255,255,255,0.05);
-                      border:1px solid var(--glass-border);
-                      color:var(--text-primary);font-family:inherit;cursor:pointer;">
-        <button type="submit" class="btn btn-primary" style="padding:8px 18px;">
-            <i class="fas fa-search"></i> Filter
+        <div class="rpt-field">
+            <label><i class="fas fa-calendar"></i> Date</label>
+            <input type="date" name="date" value="{{ report_date }}">
+        </div>
+
+        <div class="rpt-field">
+            <label><i class="fas fa-book"></i> Subject / Session</label>
+            <select name="session_filter">
+                <option value="">All Subjects</option>
+                {% for sess in all_sessions %}
+                <option value="{{ sess }}" {% if sess == session_filter %}selected{% endif %}>
+                    {{ sess }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="rpt-field">
+            <label><i class="fas fa-filter"></i> Status</label>
+            <select name="status_filter">
+                <option value="">All Statuses</option>
+                <option value="Present"  {% if status_filter == 'Present'  %}selected{% endif %}>Present</option>
+                <option value="Late"     {% if status_filter == 'Late'     %}selected{% endif %}>Late</option>
+                <option value="Absent"   {% if status_filter == 'Absent'   %}selected{% endif %}>Absent</option>
+            </select>
+        </div>
+
+        <button type="submit" class="rpt-btn">
+            <i class="fas fa-search" style="margin-right:6px;"></i>Apply
         </button>
-    </form>
 
-    <!-- Export -->
-    <a href="/export_report?date={{ report_date }}" class="btn btn-primary"
-       style="background:#10b981;">
-        <i class="fas fa-download"></i> Export CSV
-    </a>
+        <a href="/export_report?date={{ report_date }}&session_filter={{ session_filter }}"
+           class="rpt-btn-export">
+            <i class="fas fa-download"></i> Export CSV
+        </a>
+
+        {% if report_date != today %}
+        <a href="/report" class="rpt-btn-export" style="border-color:rgba(14,240,200,0.25);color:rgba(14,240,200,0.8);">
+            <i class="fas fa-calendar-day"></i> Today
+        </a>
+        {% endif %}
+
+    </div>
+</form>
+
+<!-- ── SUMMARY CHIPS ─────────────────────────────────────────────── -->
+{% set n_present = attendance_logs | selectattr('status','equalto','Present') | list | length %}
+{% set n_late    = attendance_logs | selectattr('status','equalto','Late')    | list | length %}
+{% set n_absent  = attendance_logs | selectattr('status','equalto','Absent')  | list | length %}
+{% set n_total   = attendance_logs | length %}
+
+<div class="rpt-summary">
+    <div class="rpt-chip chip-total">
+        <span class="chip-val">{{ n_total }}</span>
+        <span class="chip-lbl">Total Students</span>
+    </div>
+    <div class="rpt-chip chip-present">
+        <span class="chip-val">{{ n_present }}</span>
+        <span class="chip-lbl">Present</span>
+    </div>
+    <div class="rpt-chip chip-late">
+        <span class="chip-val">{{ n_late }}</span>
+        <span class="chip-lbl">Late</span>
+    </div>
+    <div class="rpt-chip chip-absent">
+        <span class="chip-val">{{ n_absent }}</span>
+        <span class="chip-lbl">Absent</span>
+    </div>
+    <div class="rpt-chip" style="background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);color:#f8fafc;">
+        <span class="chip-val">
+            {% if n_total > 0 %}{{ ((n_present + n_late) / n_total * 100) | round(0) | int }}%{% else %}—{% endif %}
+        </span>
+        <span class="chip-lbl">Attendance Rate</span>
+    </div>
 </div>
 
-<!-- Summary cards for this date -->
-{% set present_count = attendance_logs | selectattr("status", "equalto", "Present") | list | length %}
-{% set late_count    = attendance_logs | selectattr("status", "equalto", "Late")    | list | length %}
-{% set absent_count  = attendance_logs | selectattr("status", "equalto", "Absent")  | list | length %}
-{% set total         = attendance_logs | length %}
+<!-- ── REPORT TABLE ─────────────────────────────────────────────── -->
+<div class="rpt-table-card">
+    <div class="rpt-table-head">
+        <h3>
+            <i class="fas fa-list-alt"></i>
+            {{ report_date }}
+            {% if session_filter %}<span style="font-weight:400;color:rgba(255,255,255,0.45);font-size:13px;">· {{ session_filter }}</span>{% endif %}
+        </h3>
+        <input type="text" class="rpt-search" placeholder="Search student…" id="search-input"
+               oninput="filterTable(this.value)">
+    </div>
 
-<div class="stats-grid" style="margin-bottom:28px;">
-    <div class="card" style="border-left:4px solid #10b981;">
-        <span>Present</span><h4 style="color:#10b981;">{{ present_count }}</h4>
-    </div>
-    <div class="card" style="border-left:4px solid #f59e0b;">
-        <span>Late</span><h4 style="color:#f59e0b;">{{ late_count }}</h4>
-    </div>
-    <div class="card" style="border-left:4px solid #ef4444;">
-        <span>Absent</span><h4 style="color:#ef4444;">{{ absent_count }}</h4>
-    </div>
-    <div class="card">
-        <span>Attendance Rate</span>
-        <h4>{{ ((present_count + late_count) / total * 100)|round(1) if total else 0 }}%</h4>
-    </div>
-</div>
-
-<!-- Report table -->
-<div class="table-card">
-    <h3><i class="fas fa-file-alt"></i> Report for {{ report_date }}</h3>
-
-    <div class="table-responsive">
-    <table>
+    <div style="overflow-x:auto;">
+    <table class="rpt-tbl" id="report-table">
         <thead>
             <tr>
-                <th>Student Name</th>
-                <th>Time</th>
-                <th>Status</th>
-                <th>Confidence</th>
+                <th onclick="sortTable(0)" id="th-name">Student <span class="sort-arrow">↕</span></th>
+                <th onclick="sortTable(1)" id="th-status">Status <span class="sort-arrow">↕</span></th>
+                <th onclick="sortTable(2)">Time <span class="sort-arrow">↕</span></th>
+                <th>Session</th>
+                <th onclick="sortTable(4)">Confidence <span class="sort-arrow">↕</span></th>
                 <th>Override</th>
+                <th>Action</th>
             </tr>
         </thead>
-        <tbody>
-        {% if attendance_logs %}
+        <tbody id="report-body">
             {% for row in attendance_logs %}
-            <tr>
-                <td>{{ row.name }}</td>
-                <td>{{ row.time }}</td>
+            <tr data-name="{{ row.name | lower }}"
+                data-status="{{ row.status | lower }}"
+                class="{{ 'hidden-row' if (status_filter and row.status != status_filter) else '' }}">
+                <td style="font-weight:600;">{{ row.name }}</td>
                 <td>
-                    {% if row.status == "Present" %}
-                        <span class="badge badge-present">Present</span>
-                    {% elif row.status == "Late" %}
-                        <span class="badge badge-late">Late</span>
+                    <span class="rpt-badge badge-{{ row.status | lower }}">{{ row.status }}</span>
+                </td>
+                <td style="font-family:monospace;font-size:12px;">{{ row.time }}</td>
+                <td>
+                    <span style="font-size:12px;color:rgba(255,255,255,0.5);">
+                        {{ row.session or '—' }}
+                    </span>
+                </td>
+                <td>
+                    {% if row.confidence > 0 %}
+                    <span class="conf-bar-wrap">
+                        <span class="conf-bar" style="width:{{ [row.confidence, 100] | min }}%;"></span>
+                    </span>
+                    <span style="font-size:12px;color:rgba(255,255,255,0.5);">{{ "%.0f"|format(row.confidence) }}%</span>
                     {% else %}
-                        <span class="badge badge-absent">Absent</span>
-                    {% endif %}
-                    {% if row.override_reason %}
-                        <span class="override-tag" title="{{ row.override_reason }}">
-                            <i class="fas fa-pencil-alt"></i> edited
-                        </span>
+                    <span style="color:rgba(255,255,255,0.2);font-size:12px;">—</span>
                     {% endif %}
                 </td>
-                <td class="muted-text">
-                    {% if row.confidence > 0 %}{{ "%.1f"|format(row.confidence) }}%{% else %}–{% endif %}
+                <td>
+                    {% if row.override_reason %}
+                    <span style="font-size:11px;color:rgba(255,200,80,0.75);
+                                 background:rgba(255,200,50,0.08);
+                                 border-radius:5px;padding:2px 8px;">
+                        {{ row.override_reason[:30] }}{% if row.override_reason|length > 30 %}…{% endif %}
+                    </span>
+                    {% else %}
+                    <span style="color:rgba(255,255,255,0.15);font-size:12px;">—</span>
+                    {% endif %}
                 </td>
                 <td>
                     {% if row.record_id %}
-                    <!-- Override button (only for records that exist in DB) -->
                     <button class="btn btn-primary"
-                            style="padding:5px 12px;font-size:12px;background:rgba(255,255,255,0.08);"
-                            onclick="openOverride(
-                                {{ row.record_id }},
-                                '{{ row.name }}',
-                                '{{ row.status }}',
-                                '{{ report_date }}'
-                            )">
+                            style="padding:5px 13px;font-size:12px;"
+                            onclick="openOverride({{ row.record_id }}, '{{ row.name }}', '{{ row.status }}', '{{ report_date }}')">
                         <i class="fas fa-edit"></i> Edit
                     </button>
                     {% else %}
-                    <span class="muted-text" style="font-size:12px;">–</span>
+                    <span style="font-size:11px;color:rgba(255,255,255,0.2);">No record</span>
                     {% endif %}
                 </td>
             </tr>
+            {% else %}
+            <tr class="no-data-row">
+                <td colspan="7">
+                    <i class="fas fa-calendar-times" style="font-size:24px;display:block;margin-bottom:10px;opacity:0.3;"></i>
+                    No records for {{ report_date }}
+                    {% if session_filter %} in {{ session_filter }}{% endif %}
+                </td>
+            </tr>
             {% endfor %}
-        {% else %}
-            <tr><td colspan="5">
-                <div class="empty-state">
-                    <i class="fas fa-calendar-times"></i>
-                    <span>No records for this date.</span>
-                </div>
-            </td></tr>
-        {% endif %}
         </tbody>
     </table>
-    </div><!-- table-responsive -->
+    </div>
 </div>
 
-<!-- ── OVERRIDE MODAL ────────────────────────────────────────────────────── -->
-<div id="overrideModal" class="modal-backdrop" style="display:none;">
+<!-- ── OVERRIDE MODAL ──────────────────────────────────────────── -->
+<div class="modal-bg" id="override-modal">
     <div class="modal-box">
-        <h3 id="modalTitle"><i class="fas fa-edit"></i> Edit Attendance</h3>
+        <h4><i class="fas fa-edit"></i> Override Attendance</h4>
+
         <form method="POST" action="/override_attendance">
-            <input type="hidden" name="record_id"  id="modal_record_id">
-            <input type="hidden" name="date"        value="{{ report_date }}">
+            <input type="hidden" name="record_id" id="modal-record-id">
+            <input type="hidden" name="date" value="{{ report_date }}">
 
-            <label>Student</label>
-            <input type="text" id="modal_student_name" readonly
-                   style="width:100%;padding:8px 12px;border-radius:8px;
-                          background:rgba(255,255,255,0.04);
-                          border:1px solid var(--glass-border);
-                          color:var(--text-muted);">
+            <div class="modal-field">
+                <label>Student</label>
+                <input type="text" id="modal-student-name" readonly
+                       style="opacity:0.6;cursor:default;">
+            </div>
 
-            <label>New Status</label>
-            <select name="new_status" id="modal_new_status">
-                <option value="Present">Present</option>
-                <option value="Late">Late</option>
-                <option value="Absent">Absent</option>
-            </select>
+            <div class="modal-field">
+                <label>New Status</label>
+                <select name="new_status" id="modal-status">
+                    <option value="Present">Present</option>
+                    <option value="Late">Late</option>
+                    <option value="Absent">Absent</option>
+                </select>
+            </div>
 
-            <label>Reason <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-            <textarea name="reason" rows="3"
-                      placeholder="e.g. Student was in medical appointment"></textarea>
+            <div class="modal-field">
+                <label>Reason (optional)</label>
+                <textarea name="reason" rows="3"
+                          placeholder="e.g. Medical certificate provided…"></textarea>
+            </div>
 
-            <div style="display:flex;gap:12px;margin-top:20px;">
-                <button type="submit" class="btn btn-primary" style="flex:1;">
-                    <i class="fas fa-check"></i> Save
-                </button>
-                <button type="button" class="btn btn-primary"
-                        style="flex:1;background:rgba(255,255,255,0.06);"
-                        onclick="document.getElementById('overrideModal').style.display='none'">
-                    Cancel
+            <div class="modal-actions">
+                <button type="button" class="modal-cancel" onclick="closeOverride()">Cancel</button>
+                <button type="submit" class="modal-save">
+                    <i class="fas fa-check" style="margin-right:5px;"></i>Save
                 </button>
             </div>
         </form>
@@ -164,16 +563,55 @@
 
 {% block scripts %}
 <script>
+// ── Override modal ─────────────────────────────────────
 function openOverride(recordId, name, currentStatus, date) {
-    document.getElementById('modal_record_id').value    = recordId;
-    document.getElementById('modal_student_name').value = name;
-    document.getElementById('modal_new_status').value   = currentStatus;
-    document.getElementById('overrideModal').style.display = 'flex';
+    document.getElementById('modal-record-id').value    = recordId;
+    document.getElementById('modal-student-name').value = name;
+    document.getElementById('modal-status').value       = currentStatus;
+    document.getElementById('override-modal').classList.add('open');
+}
+function closeOverride() {
+    document.getElementById('override-modal').classList.remove('open');
+}
+// Close on backdrop click
+document.getElementById('override-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeOverride();
+});
+
+// ── Search ─────────────────────────────────────────────
+function filterTable(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('#report-body tr').forEach(function(row) {
+        var name = row.dataset.name || '';
+        row.style.display = name.includes(q) ? '' : 'none';
+    });
 }
 
-// Close modal on backdrop click
-document.getElementById('overrideModal').addEventListener('click', function(e) {
-    if (e.target === this) this.style.display = 'none';
-});
+// ── Sort ───────────────────────────────────────────────
+let sortDir = {};
+function sortTable(colIdx) {
+    var tbody = document.getElementById('report-body');
+    var rows  = Array.from(tbody.querySelectorAll('tr'));
+    sortDir[colIdx] = !sortDir[colIdx];
+    rows.sort(function(a, b) {
+        var aT = a.cells[colIdx] ? a.cells[colIdx].innerText.trim() : '';
+        var bT = b.cells[colIdx] ? b.cells[colIdx].innerText.trim() : '';
+        return sortDir[colIdx]
+            ? aT.localeCompare(bT, undefined, {numeric:true})
+            : bT.localeCompare(aT, undefined, {numeric:true});
+    });
+    rows.forEach(function(r) { tbody.appendChild(r); });
+
+    // Update header arrows
+    document.querySelectorAll('.rpt-tbl th').forEach(function(th) {
+        th.classList.remove('sorted');
+        th.querySelector('.sort-arrow') && (th.querySelector('.sort-arrow').textContent = '↕');
+    });
+    var th = document.querySelectorAll('.rpt-tbl th')[colIdx];
+    if (th) {
+        th.classList.add('sorted');
+        th.querySelector('.sort-arrow') && (th.querySelector('.sort-arrow').textContent = sortDir[colIdx] ? '↑' : '↓');
+    }
+}
 </script>
 {% endblock %}
